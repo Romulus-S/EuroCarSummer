@@ -9,9 +9,12 @@
     <h1>My First Blog Post</h1>
     <p><em>Published on February 27, 2025</em></p>
     
-    <p>This is my first blog post! I'm excited to share my thoughts here.</p>
+    <p>Tiny cabrio in Audrey Hepburn trim. 18,000€ in Palermo, Italy</p>
 
-    <img src="images/my-image.jpg" alt="A relevant image" width="300">
+    <img src="images/3:27 1.jpeg" alt="A relevant image" width="300">
+    <img src="images/3:27 2.jpeg" alt="A relevant image" width="300">
+    <img src="images/3:27 3.jpeg" alt="A relevant image" width="300">
+    <img src="images/3:27 4.jpeg" alt="A relevant image" width="300">
 
     <p><a href="index.html">Back to home</a></p>
 </body>
