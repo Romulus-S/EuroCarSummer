@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Annunci Esclusivi | Euro Car Summer</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="email-form.js" defer></script>
     <style>
         body {
             font-family: 'Trebuchet MS', sans-serif;
@@ -54,11 +55,13 @@
     <div class="email-banner">
         <div class="email-banner-inner">
             <p>Vuoi vendere la tua auto d'amatori? Scrivi qui la tua email e ti contatteremo!</p>
-            <form class="email-form" action="mailto:romulus@eurocarsummer.com" method="post" enctype="text/plain">
+             <form class="email-form" data-endpoint="https://formsubmit.co/ajax/romulus@eurocarsummer.com" action="https://formsubmit.co/romulus@eurocarsummer.com" method="POST">
                 <label for="email-annunci">
                     Indirizzo email
                     <input id="email-annunci" name="email" type="email" placeholder="tuoindirizzo@email.com" required>
                 </label>
+                <input type="hidden" name="_subject" value="Nuova richiesta Euro Car Summer">
+                <input type="hidden" name="_captcha" value="false">
                 <button type="submit">Invia</button>
                 <span class="form-helper">Le richieste vengono recapitate a romulus@eurocarsummer.com.</span>
             </form>
