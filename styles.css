@@ -145,6 +145,21 @@ body {
     border-color: white;
 }
 
+.post-detail {
+    max-width: 720px;
+    margin: 2rem auto 3rem;
+    padding: 0 1.5rem;
+}
+
+.post-detail > * {
+    margin-top: 1.25rem;
+    margin-bottom: 0;
+}
+
+.post-detail > *:first-child {
+    margin-top: 0;
+}
+
 @media (max-width: 600px) {
     .email-banner-inner {
         gap: 0.75rem;
