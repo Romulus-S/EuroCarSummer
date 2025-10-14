@@ -6,52 +6,87 @@
     <title>Macchina Del Giorno | Euro Car Summer</title>
     <link rel="stylesheet" href="styles.css">
     <style>
-        body {
-            font-family: 'Trebuchet MS', sans-serif;
-            margin: 0;
-            line-height: 1.6;
-            background-color: #f4f6f8;
-            color: #111827;
-        }
         main {
-            max-width: 960px;
+            max-width: 1080px;
             margin: 0 auto;
             padding: 0 1.5rem 3rem;
         }
+
         h1 {
-            color: #0b1f33;
+            margin-bottom: 0.5rem;
         }
-        section {
-            background: white;
-            border-radius: 12px;
-            padding: 2rem;
-            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.08);
+
+        .page-intro {
+            margin-bottom: 2.5rem;
         }
-        figure {
-            margin: 0 0 1.5rem 0;
-        }
-        figure img {
-            width: 100%;
-            max-width: 560px;
-            border-radius: 8px;
-        }
-        .details {
+
+        .post-gallery {
+            list-style: none;
+            padding: 0;
+            margin: 0;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 1rem;
-            margin-top: 1.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.75rem;
         }
-        .details div {
-            background-color: #f0f4f8;
-            padding: 1rem;
-            border-radius: 8px;
+
+        .post-card {
+            margin: 0;
         }
-        .back-link {
-            display: inline-block;
-            margin-top: 2rem;
-            color: #0b1f33;
+
+        .post-card > a {
+            display: flex;
+            flex-direction: column;
             text-decoration: none;
-            font-weight: bold;
+            color: inherit;
+            border: 1px solid rgba(11, 31, 51, 0.1);
+            border-radius: 14px;
+            overflow: hidden;
+            background: #ffffff;
+            box-shadow: 0 12px 20px -18px rgba(11, 31, 51, 0.45);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            height: 100%;
+        }
+
+        .post-card > a:hover,
+        .post-card > a:focus-visible {
+            transform: translateY(-4px);
+            box-shadow: 0 18px 28px -16px rgba(11, 31, 51, 0.55);
+        }
+
+        .post-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            padding: 1.1rem 1.25rem 0.5rem;
+        }
+
+        .post-thumbnail {
+            position: relative;
+            aspect-ratio: 4 / 3;
+            overflow: hidden;
+        }
+
+        .post-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .post-date {
+            padding: 0.75rem 1.25rem 1.25rem;
+            margin: 0;
+            color: rgba(17, 24, 39, 0.7);
+            font-size: 0.95rem;
+        }
+
+        @media (max-width: 560px) {
+            .post-title {
+                font-size: 1rem;
+            }
+
+            .post-date {
+                font-size: 0.9rem;
+            }
         }
     </style>
 </head>
@@ -65,33 +100,298 @@
     </header>
     <main>
         <h1>Macchina Del Giorno</h1>
-        <section>
-            <figure>
-                <img src="images/9:23 1.jpeg" alt="1970 Fiat 124 Sport Coupe">
-                <figcaption>La protagonista di oggi: 1970 Fiat 124 Sport Coupé.</figcaption>
-            </figure>
-            <p>
-                Ogni giorno mettiamo sotto i riflettori una vettura speciale trovata sul mercato italiano. Oggi celebriamo
-                la <strong>Fiat 124 Sport Coupé del 1970</strong>, una GT elegante che incarna lo spirito spensierato
-                dell'estate mediterranea. Con il suo motore bialbero e le linee disegnate da Mario Boano, è una compagna ideale
-                per le strade costiere tra Genova e la Riviera.
-            </p>
-            <div class="details">
-                <div>
-                    <h3>Perché ci piace</h3>
-                    <p>Un equilibrio perfetto tra prestazioni e comfort, con spazio per amici e bagagli per una fuga al mare.</p>
+        <p class="page-intro">Una raccolta di tutte le nostre scoperte quotidiane: sfoglia gli archivi e rivivi ogni Macchina del Giorno, completa della sua prima immagine.</p>
+
+        <ul class="post-gallery">
+        <li class="post-card">
+            <a href="9-23-25.html">
+                <h2 class="post-title">1970 Fiat 124 Sport Coupe</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:23 1.jpeg" alt="1970 Fiat 124 Sport Coupe" loading="lazy">
                 </div>
-                <div>
-                    <h3>Dove trovarla</h3>
-                    <p>Annuncio originale disponibile su <a href="9-23-25.html">Euro Car Summer - 23 settembre 2025</a>.</p>
+                <p class="post-date">September 23, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-22-25.html">
+                <h2 class="post-title">1969 Fiat 500L</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:21 1.jpeg" alt="1969 Fiat 500L" loading="lazy">
                 </div>
-                <div>
-                    <h3>Consiglio del giorno</h3>
-                    <p>Verifica sempre lo stato della carrozzeria: la 124 Coupé merita una verniciatura brillante per risplendere al sole.</p>
+                <p class="post-date">September 22, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-21-25.html">
+                <h2 class="post-title">1967 Lotus Europa</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:22 1.jpeg" alt="1967 Lotus Europa" loading="lazy">
                 </div>
-            </div>
-            <a class="back-link" href="index.html">← Torna agli annunci più recenti</a>
-        </section>
+                <p class="post-date">September 21, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-20-25.html">
+                <h2 class="post-title">2000 Peugeot 306 Cabriolet Saint Tropez</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:20 1.jpeg" alt="2000 Peugeot 306 Cabriolet Saint Tropez" loading="lazy">
+                </div>
+                <p class="post-date">September 20, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-19-25.html">
+                <h2 class="post-title">1992 Porsche 968</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:19 1.jpeg" alt="1992 Porsche 968" loading="lazy">
+                </div>
+                <p class="post-date">September 19, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-18-25.html">
+                <h2 class="post-title">Barn Find Citroen Meharis</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:18 1.jpeg" alt="Barn Find Citroen Meharis" loading="lazy">
+                </div>
+                <p class="post-date">September 18, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-17-25.html">
+                <h2 class="post-title">1978 Maserati Merak 2000 GT</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:17 1.jpeg" alt="1978 Maserati Merak 2000 GT" loading="lazy">
+                </div>
+                <p class="post-date">September 17, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-16-25.html">
+                <h2 class="post-title">1970 Honda Z600</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:16 1.jpeg" alt="1970 Honda Z600" loading="lazy">
+                </div>
+                <p class="post-date">September 16, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-15-25.html">
+                <h2 class="post-title">1988 Honda Civic Shuttle 4X4</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:15 1.jpeg" alt="1988 Honda Civic Shuttle 4X4" loading="lazy">
+                </div>
+                <p class="post-date">September 15, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-14-25.html">
+                <h2 class="post-title">1970 BMW 635CSi</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:14 1.jpeg" alt="1970 BMW 635CSi" loading="lazy">
+                </div>
+                <p class="post-date">September 14, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-13-25.html">
+                <h2 class="post-title">1983 VW Beetle</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:13 1.jpeg" alt="1983 VW Beetle" loading="lazy">
+                </div>
+                <p class="post-date">September 13, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-12-25.html">
+                <h2 class="post-title">1985 Autobianchi A112 Abarth</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:12 1.jpeg" alt="1985 Autobianchi A112 Abarth" loading="lazy">
+                </div>
+                <p class="post-date">September 12, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-11-25.html">
+                <h2 class="post-title">1960 Cisitalia 850 Abarth Barchetta</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:11 1.jpeg" alt="1960 Cisitalia 850 Abarth Barchetta" loading="lazy">
+                </div>
+                <p class="post-date">September 11, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-10-25.html">
+                <h2 class="post-title">1970 Fiat 616</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:10 1.jpeg" alt="1970 Fiat 616" loading="lazy">
+                </div>
+                <p class="post-date">September 10, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-9-25.html">
+                <h2 class="post-title">1960 BMW 700</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:9 1.jpeg" alt="1960 BMW 700" loading="lazy">
+                </div>
+                <p class="post-date">September 9, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-8-25.html">
+                <h2 class="post-title">1979 Fiat 131 Supermirafiori 1300TC</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:8 1.jpeg" alt="1979 Fiat 131 Supermirafiori 1300TC" loading="lazy">
+                </div>
+                <p class="post-date">September 8, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-7-25.html">
+                <h2 class="post-title">1963 Innocenti 1100 S Spider</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:7 1.jpeg" alt="1963 Innocenti 1100 S Spider" loading="lazy">
+                </div>
+                <p class="post-date">September 7, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-6-25.html">
+                <h2 class="post-title">1992 SEAT Marbella 850 Jeans</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:6 1.jpeg" alt="1992 SEAT Marbella 850 Jeans" loading="lazy">
+                </div>
+                <p class="post-date">September 6, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-5-25.html">
+                <h2 class="post-title">1987 Porsche 928 S4</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:5 1.jpeg" alt="1987 Porsche 928 S4" loading="lazy">
+                </div>
+                <p class="post-date">September 5, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-4-25.html">
+                <h2 class="post-title">1960 Fiat Campagnola</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:4 2.jpeg" alt="1960 Fiat Campagnola" loading="lazy">
+                </div>
+                <p class="post-date">September 4, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-3-25.html">
+                <h2 class="post-title">1982 Fiat 127 Sport</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:3 1.jpeg" alt="1982 Fiat 127 Sport" loading="lazy">
+                </div>
+                <p class="post-date">September 3, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-2-25.html">
+                <h2 class="post-title">1970 Autobianchi Giardiniera</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:2 1.jpeg" alt="1970 Autobianchi Giardiniera" loading="lazy">
+                </div>
+                <p class="post-date">September 2, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="9-1-25.html">
+                <h2 class="post-title">1991 Fiat 126 Bis Up</h2>
+                <div class="post-thumbnail">
+                    <img src="images/9:1 1.jpeg" alt="1991 Fiat 126 Bis Up" loading="lazy">
+                </div>
+                <p class="post-date">September 1, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="8-31-25.html">
+                <h2 class="post-title">1960 Fiat 500 D</h2>
+                <div class="post-thumbnail">
+                    <img src="images/8:31 1.jpeg" alt="1960 Fiat 500 D" loading="lazy">
+                </div>
+                <p class="post-date">August 31, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="8-30-25.html">
+                <h2 class="post-title">1988 Fiat Panda 4X4 Sisley</h2>
+                <div class="post-thumbnail">
+                    <img src="images/8:30 1.jpeg" alt="1988 Fiat Panda 4X4 Sisley" loading="lazy">
+                </div>
+                <p class="post-date">August 30, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="8-29-25.html">
+                <h2 class="post-title">1981 Land Rover Defender 88</h2>
+                <div class="post-thumbnail">
+                    <img src="images/8:29 1.jpeg" alt="1981 Land Rover Defender 88" loading="lazy">
+                </div>
+                <p class="post-date">August 29, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="8-28-25.html">
+                <h2 class="post-title">1949 Fiat 500 Topolino C</h2>
+                <div class="post-thumbnail">
+                    <img src="images/8:28 1.jpeg" alt="1949 Fiat 500 Topolino C" loading="lazy">
+                </div>
+                <p class="post-date">August 28, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="8-27-25.html">
+                <h2 class="post-title">1971 Fiat 500 L</h2>
+                <div class="post-thumbnail">
+                    <img src="images/8:27 6.jpeg" alt="1971 Fiat 500 L" loading="lazy">
+                </div>
+                <p class="post-date">August 27, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="8-26-25.html">
+                <h2 class="post-title">1980 Renault 4</h2>
+                <div class="post-thumbnail">
+                    <img src="images/8:26 1.jpeg" alt="1980 Renault 4" loading="lazy">
+                </div>
+                <p class="post-date">August 26, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="5-6-25.html">
+                <h2 class="post-title">1973 Fiat 124 Sport Coupe</h2>
+                <div class="post-thumbnail">
+                    <img src="images/5:6 1.jpeg" alt="1973 Fiat 124 Sport Coupe" loading="lazy">
+                </div>
+                <p class="post-date">May 6, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="5-5-25.html">
+                <h2 class="post-title">1979 BMW 316</h2>
+                <div class="post-thumbnail">
+                    <img src="images/5:5 1.jpeg" alt="1979 BMW 316" loading="lazy">
+                </div>
+                <p class="post-date">May 5, 2025</p>
+            </a>
+        </li>
+        <li class="post-card">
+            <a href="3-27-25.html">
+                <h2 class="post-title">1965 Autobianchi Bianchina Cabriolet</h2>
+                <div class="post-thumbnail">
+                    <img src="images/3:27 1.jpeg" alt="1965 Autobianchi Bianchina Cabriolet" loading="lazy">
+                </div>
+                <p class="post-date">March 27, 2025</p>
+            </a>
+        </li>
+        </ul>
     </main>
 </body>
 </html>
