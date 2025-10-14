@@ -1,0 +1,49 @@
+:root {
+    --brand-navy: #0b1f33;
+    --brand-cream: #f4f6f8;
+    --text-primary: #111827;
+    --font-sans: 'Trebuchet MS', sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+}
+
+.site-header {
+    background-color: var(--brand-navy);
+    color: white;
+    padding: 1rem 0;
+    margin-bottom: 2rem;
+}
+
+.site-header nav {
+    max-width: 960px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    font-weight: bold;
+}
+
+.site-header a {
+    color: white;
+    text-decoration: none;
+    padding-bottom: 0.25rem;
+    border-bottom: 2px solid transparent;
+    transition: border-color 0.2s ease;
+}
+
+.site-header a:hover,
+.site-header a:focus-visible {
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+.site-header a[aria-current="page"] {
+    border-color: white;
+}
