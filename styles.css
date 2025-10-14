@@ -131,7 +131,7 @@ body {
 }
 
 @media (max-width: 600px) {
-     .email-banner-inner {
+    .email-banner-inner {
         gap: 0.75rem;
     }
 
@@ -157,7 +157,6 @@ body {
         row-gap: 0.75rem;
     }
 }
-
 
 .post-gallery {
     list-style: none;
