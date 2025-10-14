@@ -67,6 +67,7 @@ function ensureSiteHeader() {
           <a href="index.html">Home</a>
           <a href="macchina-del-giorno.html">Macchina Del Giorno</a>
           <a href="annunci-esclusivi.html">Annunci Esclusivi</a>
+          <a href="aste.html">Aste</a>
         </nav>
       </div>
     </header>
@@ -88,6 +89,7 @@ function highlightActiveNav(links) {
     { href: 'index.html', match: (value) => value === '' || value === 'index.html' },
     { href: 'macchina-del-giorno.html', match: (value) => value === 'macchina-del-giorno.html' || /^\d{1,2}-\d{1,2}-\d{2}\.html$/i.test(value) },
     { href: 'annunci-esclusivi.html', match: (value) => value === 'annunci-esclusivi.html' },
+    { href: 'aste.html', match: (value) => value === 'aste.html' },
   ];
 
   patterns.forEach(({ href, match }) => {
