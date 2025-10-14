@@ -77,6 +77,21 @@ body {
 .email-form .form-helper {
     font-size: 0.85rem;
     color: rgba(11, 31, 51, 0.6);
+    flex-basis: 100%;
+    min-height: 1.1rem;
+}
+
+.email-form .form-helper.is-success {
+    color: #0f8a5f;
+}
+
+.email-form .form-helper.is-error {
+    color: #c53b3b;
+}
+
+.email-form.is-submitting button {
+    opacity: 0.6;
+    cursor: progress;
 }
 
 .site-header {
@@ -141,6 +156,10 @@ body {
     }
 
     .email-form button {
+        width: fit-content;
+    }
+
+     .email-form.is-submitting button {
         width: fit-content;
     }
 
