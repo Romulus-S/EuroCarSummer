@@ -26,41 +26,65 @@
             max-width: 42rem;
         }
 
-        .listing-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.75rem;
-            list-style: none;
-            padding: 0;
-            margin: 0;
+        .preview-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 2.5rem;
+            margin-top: 2.5rem;
         }
 
-        .listing-grid li {
+        .preview-block {
+            background: rgba(244, 246, 248, 0.85);
+            border-radius: 18px;
+            padding: 2rem;
+            text-align: left;
+            box-shadow: 0 24px 40px -30px rgba(11, 31, 51, 0.5);
+        }
+
+        .preview-header {
             display: flex;
             flex-direction: column;
             gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .preview-header h2 {
+            margin: 0;
+            font-size: 1.75rem;
+            color: var(--brand-navy);
+        }
+
+        .preview-header p {
+            margin: 0;
+            color: rgba(17, 24, 39, 0.78);
+        }
+
+        .preview-link {
+            align-self: flex-start;
+            display: inline-flex;
             align-items: center;
-            background-color: rgba(244, 246, 248, 0.6);
-            padding: 1.25rem;
-            border-radius: 12px;
-        }
-
-        .listing-grid img {
-            width: 100%;
-            max-width: 300px;
-            border-radius: 10px;
-        }
-
-        .social-links {
-            text-align: center;
-            margin: 3rem 0 4rem;
-        }
-
-        .social-links a {
-            margin: 0 0.75rem;
+            gap: 0.35rem;
+            font-weight: bold;
             color: var(--brand-navy);
             text-decoration: none;
-            font-weight: bold;
+        }
+
+        .preview-block .post-gallery {
+            margin-top: 1rem;
+        }
+
+        .preview-block .post-title {
+            color: var(--brand-navy);
+        }
+
+        .preview-block .post-date {
+            font-weight: 500;
+        }
+
+        @media (max-width: 600px) {
+            .preview-block {
+                padding: 1.75rem 1.5rem;
+            }
         }
     </style>
 </head>
@@ -69,9 +93,9 @@
         <div class="email-banner-inner">
             <p>Vuoi vendere la tua auto d'amatori? Scrivi qui la tua email e ti contatteremo!</p>
             <form class="email-form" action="mailto:romulus@eurocarsummer.com" method="post" enctype="text/plain">
-                <label for="email-annunci">
+                <label for="email-home">
                     Indirizzo email
-                    <input id="email-annunci" name="email" type="email" placeholder="tuoindirizzo@email.com" required>
+                    <input id="email-home" name="email" type="email" placeholder="tuoindirizzo@email.com" required>
                 </label>
                 <button type="submit">Invia</button>
                 <span class="form-helper">Le richieste vengono recapitate a romulus@eurocarsummer.com.</span>
@@ -79,46 +103,57 @@
         </div>
     </div>
     <header class="site-header">
-         <div class="header-inner">
+        <div class="header-inner">
             <a class="brand" href="index.html">
-               <img src="images/textlogo.png" alt="Euro Car Summer logo" height="48">
+                <img src="images/textlogo.png" alt="Euro Car Summer logo" height="48">
             </a>
             <nav>
-                <a href="index.html">Home</a>
+                <a href="index.html" aria-current="page">Home</a>
                 <a href="macchina-del-giorno.html">Macchina Del Giorno</a>
-                <a href="annunci-esclusivi.html" aria-current="page">Annunci Esclusivi</a>
+                <a href="annunci-esclusivi.html">Annunci Esclusivi</a>
             </nav>
         </div>
     </header>
     <main>
         <section class="hero">
             <img src="images/textlogo.png" alt="Euro Car Summer">
-            <p>Macchine per amatori. Le migliori auto in vendita online, compresi i nostri nuovi annunci esclusivi.</p>
-        </section>
-        <div class="preview-stack">
+            <p>Channel the Mediterranean this summer by bringing a Euro car home. On this website, you'll find the coolest rides available for sale today in Italy.</p>
+            <div class="preview-stack">
                 <section class="preview-block">
                     <div class="preview-header">
                         <h2>Annunci Esclusivi</h2>
                         <p>Una selezione curata dei migliori affari estivi: sportive rare, icone da spiaggia e instant classic pronti a partire.</p>
                         <a class="preview-link" href="annunci-esclusivi.html">Esplora gli annunci →</a>
                     </div>
-                    <div class="preview-grid">
-                        <article class="preview-card">
-                            <img src="images/9:17 1.jpeg" alt="1978 Maserati Merak 2000 GT">
-                            <h3>Maserati Merak 2000 GT</h3>
-                            <p>Una delle poche Merak a quattro posti rimaste in condizioni impeccabili.</p>
-                        </article>
-                        <article class="preview-card">
-                            <img src="images/9:21 1.jpeg" alt="1967 Lotus Europa">
-                            <h3>Lotus Europa S1</h3>
-                            <p>Peso piuma e fascino britannico per i tornanti dell'Appennino.</p>
-                        </article>
-                        <article class="preview-card">
-                            <img src="images/9:18 1.jpeg" alt="Citroën Méhari Barn Find">
-                            <h3>Citroën Méhari Barn Find</h3>
-                            <p>Pronta a tornare a respirare l'aria salmastra con un restauro leggero.</p>
-                        </article>
-                    </div>
+                    <ul class="post-gallery">
+                        <li class="post-card">
+                            <a href="annunci-esclusivi.html#merak">
+                                <h3 class="post-title">Maserati Merak 2000 GT</h3>
+                                <div class="post-thumbnail">
+                                    <img src="images/9:17 1.jpeg" alt="1978 Maserati Merak 2000 GT">
+                                </div>
+                                <p class="post-date">Annuncio esclusivo • settembre 2025</p>
+                            </a>
+                        </li>
+                        <li class="post-card">
+                            <a href="annunci-esclusivi.html#lotus">
+                                <h3 class="post-title">Lotus Europa S1</h3>
+                                <div class="post-thumbnail">
+                                    <img src="images/9:21 1.jpeg" alt="1967 Lotus Europa">
+                                </div>
+                                <p class="post-date">Scopri la selezione completa →</p>
+                            </a>
+                        </li>
+                        <li class="post-card">
+                            <a href="annunci-esclusivi.html#mehari">
+                                <h3 class="post-title">Citroën Méhari Barn Find</h3>
+                                <div class="post-thumbnail">
+                                    <img src="images/9:18 1.jpeg" alt="Citroën Méhari Barn Find">
+                                </div>
+                                <p class="post-date">Un assaggio degli annunci premium</p>
+                            </a>
+                        </li>
+                    </ul>
                 </section>
                 <section class="preview-block">
                     <div class="preview-header">
@@ -126,23 +161,35 @@
                         <p>Ogni mattina mettiamo sotto i riflettori un annuncio speciale, completo della sua prima immagine e della data.</p>
                         <a class="preview-link" href="macchina-del-giorno.html">Sfoglia tutte le macchine →</a>
                     </div>
-                    <div class="preview-grid">
-                        <article class="preview-card">
-                            <img src="images/9:23 1.jpeg" alt="1970 Fiat 124 Sport Coupé">
-                            <h3>1970 Fiat 124 Sport Coupé</h3>
-                            <p class="preview-date">23 settembre 2025</p>
-                        </article>
-                        <article class="preview-card">
-                            <img src="images/9:20 1.jpeg" alt="2000 Peugeot 306 Cabriolet Saint-Tropez">
-                            <h3>2000 Peugeot 306 Cabriolet</h3>
-                            <p class="preview-date">20 settembre 2025</p>
-                        </article>
-                        <article class="preview-card">
-                            <img src="images/9:19 1.jpeg" alt="2005 Mercedes-Benz CLK 200 Kompressor Cabriolet">
-                            <h3>2005 Mercedes-Benz CLK 200</h3>
-                            <p class="preview-date">19 settembre 2025</p>
-                        </article>
-                    </div>
+                    <ul class="post-gallery">
+                        <li class="post-card">
+                            <a href="9-23-25.html">
+                                <h3 class="post-title">1970 Fiat 124 Sport Coupé</h3>
+                                <div class="post-thumbnail">
+                                    <img src="images/9:23 1.jpeg" alt="1970 Fiat 124 Sport Coupé">
+                                </div>
+                                <p class="post-date">23 settembre 2025</p>
+                            </a>
+                        </li>
+                        <li class="post-card">
+                            <a href="9-20-25.html">
+                                <h3 class="post-title">2000 Peugeot 306 Cabriolet</h3>
+                                <div class="post-thumbnail">
+                                    <img src="images/9:20 1.jpeg" alt="2000 Peugeot 306 Cabriolet Saint-Tropez">
+                                </div>
+                                <p class="post-date">20 settembre 2025</p>
+                            </a>
+                        </li>
+                        <li class="post-card">
+                            <a href="9-19-25.html">
+                                <h3 class="post-title">2005 Mercedes-Benz CLK 200</h3>
+                                <div class="post-thumbnail">
+                                    <img src="images/9:19 1.jpeg" alt="2005 Mercedes-Benz CLK 200 Kompressor Cabriolet">
+                                </div>
+                                <p class="post-date">19 settembre 2025</p>
+                            </a>
+                        </li>
+                    </ul>
                 </section>
             </div>
         </section>
