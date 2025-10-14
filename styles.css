@@ -15,6 +15,70 @@ body {
     color: var(--text-primary);
 }
 
+.email-banner {
+    background: #fff6e6;
+    border-bottom: 1px solid rgba(11, 31, 51, 0.08);
+}
+
+.email-banner-inner {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.email-banner p {
+    margin: 0;
+    font-weight: 600;
+    color: var(--brand-navy);
+}
+
+.email-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.email-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.95rem;
+    color: rgba(11, 31, 51, 0.8);
+}
+
+.email-form input[type="email"] {
+    min-width: 260px;
+    padding: 0.65rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid rgba(11, 31, 51, 0.25);
+    font-size: 1rem;
+}
+
+.email-form button {
+    background: var(--brand-navy);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.65rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.email-form button:hover,
+.email-form button:focus-visible {
+    opacity: 0.85;
+}
+
+.email-form .form-helper {
+    font-size: 0.85rem;
+    color: rgba(11, 31, 51, 0.6);
+}
+
 .site-header {
     background-color: var(--brand-navy);
     color: white;
@@ -67,6 +131,19 @@ body {
 }
 
 @media (max-width: 600px) {
+     .email-banner-inner {
+        gap: 0.75rem;
+    }
+
+    .email-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .email-form button {
+        width: fit-content;
+    }
+
     .site-header .header-inner {
         flex-direction: column;
         align-items: flex-start;
