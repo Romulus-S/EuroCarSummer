@@ -1,0 +1,9 @@
+{
+  "apiKey": "INSERISCI_API_KEY_FIREBASE",
+  "authDomain": "il-tuo-progetto.firebaseapp.com",
+  "projectId": "il-tuo-progetto",
+  "storageBucket": "il-tuo-progetto.appspot.com",
+  "messagingSenderId": "INSERISCI_SENDER_ID",
+  "appId": "INSERISCI_APP_ID",
+  "measurementId": "INSERISCI_MEASUREMENT_ID_OPZIONALE"
+}
