@@ -20,13 +20,20 @@ const commentState = {
   helperDefault: '',
   form: null,
   textarea: null,
+  nameInput: null,
+  emailInput: null,
+  formGrid: null,
   status: null,
   callout: null,
   loading: null,
   services: null,
   unsubscribe: null,
   currentUser: null,
+  useLocal: false,
+  localComments: [],
 };
+
+const LOCAL_COMMENT_KEY_PREFIX = 'ecsComments:';
 
 const FIREBASE_SCRIPT_SOURCES = [
   'https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js',
@@ -41,6 +48,39 @@ let firebaseServices = null;
 let firebaseActiveUser = null;
 let firebaseObserverAttached = false;
 const authSubscribers = [];
+
+function getLocalCommentKey(postId) {
+  if (!postId) return `${LOCAL_COMMENT_KEY_PREFIX}unknown`;
+  return `${LOCAL_COMMENT_KEY_PREFIX}${postId}`;
+}
+
+function loadLocalComments(postId) {
+  if (!authStorage) return [];
+  try {
+    const raw = authStorage.getItem(getLocalCommentKey(postId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((entry) => entry && typeof entry === 'object')
+      .sort((a, b) => {
+        const timeA = new Date((a && a.createdAt) || 0).getTime();
+        const timeB = new Date((b && b.createdAt) || 0).getTime();
+        return timeB - timeA;
+      });
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveLocalComments(postId, comments) {
+  if (!authStorage) return;
+  try {
+    authStorage.setItem(getLocalCommentKey(postId), JSON.stringify(Array.isArray(comments) ? comments : []));
+  } catch (error) {
+    // ignore storage errors
+  }
+}
 
 function loadExternalScript(src) {
   if (!src) return Promise.reject(new Error('Missing script source'));
@@ -83,7 +123,14 @@ function loadExternalScript(src) {
 function hasFirebaseConfig(config) {
   if (!config || typeof config !== 'object') return false;
   const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'appId'];
-  return requiredKeys.every((key) => typeof config[key] === 'string' && config[key].trim());
+  return requiredKeys.every((key) => {
+    const value = config[key];
+    if (typeof value !== 'string') return false;
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+    if (/INSERISCI|il-tuo-progetto/i.test(trimmed)) return false;
+    return true;
+  });
 }
 
 async function loadFirebaseConfig() {
@@ -972,7 +1019,17 @@ function createCommentSection() {
         </div>
       </div>
       <form class="comment-form" hidden>
-        <label>
+        <div class="comment-form-grid">
+          <label class="comment-field">
+            Nome
+            <input name="comment-name" type="text" placeholder="Il tuo nome (opzionale)">
+          </label>
+          <label class="comment-field">
+            Email
+            <input name="comment-email" type="email" placeholder="Email (non verrà pubblicata)">
+          </label>
+        </div>
+        <label class="comment-field">
           Il tuo commento
           <textarea name="comment-body" rows="4" maxlength="1000" required placeholder="Che ne pensi di questa auto?"></textarea>
         </label>
@@ -1115,7 +1172,7 @@ function updateCommentAvailability() {
   const servicesReady = !!(commentState.services && commentState.services.db);
   const user = commentState.currentUser;
 
-  if (!servicesReady) {
+   if (!servicesReady && !commentState.useLocal) {
     commentState.form.hidden = true;
     commentState.callout.hidden = true;
     if (commentState.helper && commentState.helperDefault) {
@@ -1124,12 +1181,42 @@ function updateCommentAvailability() {
     return;
   }
 
+  if (commentState.useLocal) {
+    commentState.form.hidden = false;
+    commentState.callout.hidden = true;
+    if (commentState.helper) {
+      commentState.helper.textContent = 'Scrivi un commento: sarà salvato solo su questo dispositivo.';
+    }
+    if (commentState.formGrid) {
+      commentState.formGrid.hidden = false;
+    }
+    if (commentState.nameInput) {
+      commentState.nameInput.disabled = false;
+    }
+    if (commentState.emailInput) {
+      commentState.emailInput.disabled = false;
+    }
+    return;
+  }
+
+
   if (user) {
     commentState.form.hidden = false;
     commentState.callout.hidden = true;
     if (commentState.helper) {
       const friendly = user.displayName || deriveNameFromEmail(user.email);
       commentState.helper.textContent = `Stai commentando come ${friendly}.`;
+    }
+    if (commentState.formGrid) {
+      commentState.formGrid.hidden = true;
+    }
+    if (commentState.nameInput) {
+      commentState.nameInput.disabled = true;
+      commentState.nameInput.value = '';
+    }
+    if (commentState.emailInput) {
+      commentState.emailInput.disabled = true;
+      commentState.emailInput.value = '';
     }
   } else {
     if (commentState.form && typeof commentState.form.reset === 'function') {
@@ -1140,6 +1227,9 @@ function updateCommentAvailability() {
     setCommentFormStatus('', null);
     if (commentState.helper && commentState.helperDefault) {
       commentState.helper.textContent = commentState.helperDefault;
+    }
+    if (commentState.formGrid) {
+      commentState.formGrid.hidden = true;
     }
   }
 }
@@ -1153,20 +1243,66 @@ async function handleCommentSubmit(event) {
     return;
   }
 
-  const user = commentState.currentUser;
-  if (!user || !user.uid) {
-    updateCommentAvailability();
-    setCommentFormStatus('Accedi per lasciare un commento.', 'error');
-    return;
-  }
-
-  const textarea = commentState.textarea;
+const textarea = commentState.textarea;
   const value = textarea ? textarea.value.trim() : '';
   if (!value) {
     setCommentFormStatus('Scrivi qualcosa prima di pubblicare.', 'error');
     if (textarea) {
       textarea.focus();
     }
+    return;
+  }
+
+  const useLocal = commentState.useLocal && !!authStorage;
+
+  if (useLocal) {
+    const nameInput = commentState.nameInput;
+    const emailInput = commentState.emailInput;
+    const nameValue = nameInput ? nameInput.value.trim() : '';
+    const emailValue = normaliseEmail(emailInput ? emailInput.value : '');
+
+    if (!nameValue && !emailValue) {
+      setCommentFormStatus('Inserisci il tuo nome o indirizzo email.', 'error');
+      if (nameInput) {
+        nameInput.focus();
+      }
+      return;
+    }
+
+    const entry = {
+      id: `local-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      body: value,
+      authorName: nameValue || null,
+      authorEmail: emailValue || null,
+      createdAt: new Date().toISOString(),
+    };
+
+    const existing = loadLocalComments(commentState.postId);
+    existing.unshift(entry);
+    saveLocalComments(commentState.postId, existing);
+    commentState.localComments = existing;
+    renderCommentList(existing);
+    const preservedName = nameValue;
+    const preservedEmail = emailValue;
+    commentState.form.reset();
+    if (nameInput) {
+      nameInput.value = preservedName;
+    }
+    if (emailInput) {
+      emailInput.value = preservedEmail;
+    }
+    setCommentFormStatus('Commento pubblicato!', 'success');
+    updateCommentBanner('I commenti sono salvati localmente su questo dispositivo.', 'info');
+    if (textarea) {
+      textarea.focus();
+    }
+    return;
+  }
+
+  const user = commentState.currentUser;
+  if (!user || !user.uid) {
+    updateCommentAvailability();
+    setCommentFormStatus('Accedi per lasciare un commento.', 'error');
     return;
   }
 
@@ -1259,9 +1395,14 @@ function initialiseCommentSystem() {
   commentState.helperDefault = commentState.helper ? commentState.helper.textContent : '';
   commentState.form = section.querySelector('.comment-form');
   commentState.textarea = section.querySelector('textarea[name="comment-body"]');
+  commentState.nameInput = section.querySelector('input[name="comment-name"]');
+  commentState.emailInput = section.querySelector('input[name="comment-email"]');
+  commentState.formGrid = section.querySelector('.comment-form-grid');
   commentState.status = section.querySelector('.comment-status');
   commentState.callout = section.querySelector('.comment-auth-callout');
   commentState.loading = section.querySelector('.comments-loading');
+  commentState.useLocal = false;
+  commentState.localComments = [];
 
   const loginButton = section.querySelector('.comment-login');
   if (loginButton) {
@@ -1287,8 +1428,22 @@ function initialiseCommentSystem() {
   prepareFirebase()
     .then((services) => {
       if (!services || !services.db) {
-        updateCommentBanner('Configura Firebase per attivare i commenti.', 'error');
-        return;
+        const localFallback = loadLocalComments(commentState.postId);
+        if (localFallback.length) {
+          commentState.localComments = localFallback;
+          commentState.useLocal = true;
+          renderCommentList(localFallback);
+          updateCommentBanner('I commenti sono salvati localmente su questo dispositivo.', 'info');
+        } else {
+          commentState.useLocal = !!authStorage;
+          if (commentState.useLocal) {
+            renderCommentList([]);
+            updateCommentBanner('I commenti saranno salvati sul tuo dispositivo.', 'info');
+          } else {
+            updateCommentBanner('Commenti non disponibili su questo dispositivo.', 'error');
+          }
+        }
+        updateCommentAvailability();
       }
       commentState.services = services;
       updateCommentAvailability();
@@ -1307,11 +1462,17 @@ window.addEventListener('beforeunload', () => {
 });
 
 
-document.addEventListener('DOMContentLoaded', () => {
+function bootstrapSiteChrome() {
   ensureSiteHeader();
   ensureEmailBanner();
   initialiseEmailForms();
   initialiseAuthSystem();
   initialiseCommentSystem();
   initialiseAdminDashboard();
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootstrapSiteChrome);
+} else {
+  bootstrapSiteChrome();
+}
