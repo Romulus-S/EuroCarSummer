@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Amministratore • Euro Car Summer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="email-form.js" defer></script>
+</head>
+<body>
+    <main class="admin-dashboard">
+        <header class="admin-header">
+            <h1>Dashboard amministratore</h1>
+            <p>Solo Romulus (romulus@eurocarsummer.com) può visualizzare l'elenco completo degli account registrati.</p>
+            <button type="button" class="admin-refresh">Aggiorna elenco</button>
+            <p class="admin-status" role="status">Configura Firebase e accedi con il tuo account per iniziare.</p>
+        </header>
+        <section class="admin-content">
+            <table class="admin-table" hidden>
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Email</th>
+                        <th>Ruolo</th>
+                        <th>Verificato</th>
+                        <th>Creato il</th>
+                        <th>Ultimo accesso</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </section>
+    </main>
+</body>
+</html>
