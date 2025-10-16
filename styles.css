@@ -511,7 +511,7 @@ body {
         width: fit-content;
     }
 
-     .email-form.is-submitting button {
+    .email-form.is-submitting button {
         width: fit-content;
     }
 
@@ -539,8 +539,6 @@ body {
     .logout-button {
         padding: 0.5rem 1.1rem;
     }
-}
-
 
     .comment-item {
         padding: 1rem 1.1rem;
@@ -561,6 +559,7 @@ body {
         width: 100%;
         justify-content: flex-start;
     }
+}
 
 .post-gallery {
     list-style: none;
@@ -1024,7 +1023,6 @@ body.auth-modal-open {
         font-size: 1.5rem;
     }
 }
-
 
 .admin-dashboard {
     max-width: 960px;
