@@ -7,6 +7,26 @@ function slugifyPath(pathname) {
 }
 
 const ADMIN_EMAIL = 'romulus@eurocarsummer.com';
+const DATE_PAGE_PATTERN = /^\d{1,2}-\d{1,2}-\d{2}\.html$/i;
+
+const commentState = {
+  initialised: false,
+  postId: null,
+  section: null,
+  list: null,
+  count: null,
+  empty: null,
+  helper: null,
+  helperDefault: '',
+  form: null,
+  textarea: null,
+  status: null,
+  callout: null,
+  loading: null,
+  services: null,
+  unsubscribe: null,
+  currentUser: null,
+};
 
 const FIREBASE_SCRIPT_SOURCES = [
   'https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js',
@@ -926,10 +946,372 @@ function initialiseAdminDashboard() {
   });
 }
 
+function isDateDetailPage() {
+  const pathname = window.location.pathname || '';
+  const file = pathname.split('/').pop() || '';
+  return DATE_PAGE_PATTERN.test(file);
+}
+
+function createCommentSection() {
+  const template = document.createElement('template');
+  template.innerHTML = `
+    <section class="comments-section" aria-labelledby="comments-heading">
+      <div class="comments-header">
+        <h2 id="comments-heading">Commenti</h2>
+        <span class="comment-count" aria-live="polite">0 commenti</span>
+      </div>
+      <p class="comments-helper">Condividi le tue impressioni su questa Macchina del Giorno.</p>
+      <p class="comments-loading" role="status" aria-live="polite">Caricamento commenti…</p>
+      <ul class="comment-list" hidden></ul>
+      <p class="comments-empty" hidden>Sii il primo a commentare questa auto!</p>
+      <div class="comment-auth-callout" hidden>
+        <p><strong>Accedi</strong> o <strong>registrati</strong> per partecipare alla conversazione.</p>
+        <div class="comment-auth-actions">
+          <button type="button" class="comment-login">Accedi</button>
+          <button type="button" class="comment-register">Registrati</button>
+        </div>
+      </div>
+      <form class="comment-form" hidden>
+        <label>
+          Il tuo commento
+          <textarea name="comment-body" rows="4" maxlength="1000" required placeholder="Che ne pensi di questa auto?"></textarea>
+        </label>
+        <p class="comment-status" role="status" aria-live="polite"></p>
+        <button type="submit">Pubblica commento</button>
+      </form>
+    </section>
+  `.trim();
+  return template.content.firstElementChild;
+}
+
+function updateCommentBanner(message, state) {
+  const target = commentState.loading;
+  if (!target) return;
+  if (!message) {
+    target.textContent = '';
+    target.hidden = true;
+    if (target.dataset) {
+      delete target.dataset.state;
+    }
+    return;
+  }
+  target.hidden = false;
+  target.textContent = message;
+  if (target.dataset) {
+    if (state) {
+      target.dataset.state = state;
+    } else {
+      delete target.dataset.state;
+    }
+  }
+}
+
+function setCommentCount(count) {
+  if (!commentState.count) return;
+  const safeCount = Number.isFinite(count) ? count : 0;
+  const label = safeCount === 1 ? '1 commento' : `${safeCount} commenti`;
+  commentState.count.textContent = label;
+  commentState.count.setAttribute('data-count', String(safeCount));
+}
+
+function normaliseCommentDate(value) {
+  if (!value) return null;
+  try {
+    if (typeof value.toDate === 'function') {
+      const converted = value.toDate();
+      if (converted instanceof Date && !Number.isNaN(converted.getTime())) {
+        return converted;
+      }
+    }
+    if (typeof value === 'object' && typeof value.seconds === 'number') {
+      const millis = value.seconds * 1000 + (value.nanoseconds ? value.nanoseconds / 1e6 : 0);
+      const fromSeconds = new Date(millis);
+      if (!Number.isNaN(fromSeconds.getTime())) {
+        return fromSeconds;
+      }
+    }
+    const fallback = new Date(value);
+    if (!Number.isNaN(fallback.getTime())) {
+      return fallback;
+    }
+  } catch (error) {
+    // ignore parsing errors
+  }
+  return null;
+}
+
+function formatCommentDate(value) {
+  const date = normaliseCommentDate(value);
+  if (!date) {
+    const now = new Date();
+    return { text: 'Appena adesso', iso: now.toISOString() };
+  }
+  return {
+    text: date.toLocaleString('it-IT', { dateStyle: 'medium', timeStyle: 'short' }),
+    iso: date.toISOString(),
+  };
+}
+
+function renderCommentList(items) {
+  if (!commentState.list || !commentState.empty) return;
+  const comments = Array.isArray(items) ? items : [];
+  commentState.list.innerHTML = '';
+  const count = comments.length;
+  setCommentCount(count);
+
+  if (count === 0) {
+    commentState.list.hidden = true;
+    commentState.empty.hidden = false;
+    return;
+  }
+
+  commentState.list.hidden = false;
+  commentState.empty.hidden = true;
+
+  comments.forEach((entry) => {
+    const data = entry || {};
+    const item = document.createElement('li');
+    item.className = 'comment-item';
+
+    const meta = document.createElement('div');
+    meta.className = 'comment-meta';
+
+    const author = document.createElement('span');
+    author.className = 'comment-author';
+    author.textContent = data.authorName || deriveNameFromEmail(data.authorEmail) || 'Appassionato';
+    meta.appendChild(author);
+
+    const time = document.createElement('time');
+    time.className = 'comment-time';
+    const formatted = formatCommentDate(data.createdAt);
+    time.dateTime = formatted.iso;
+    time.textContent = formatted.text;
+    meta.appendChild(time);
+
+    item.appendChild(meta);
+
+    const body = document.createElement('p');
+    body.className = 'comment-body';
+    body.textContent = (data.body || '').trim();
+    item.appendChild(body);
+
+    commentState.list.appendChild(item);
+  });
+}
+
+function setCommentFormStatus(message, type) {
+  if (!commentState.status) return;
+  commentState.status.textContent = message || '';
+  commentState.status.classList.remove('is-success', 'is-error');
+  if (type === 'success') {
+    commentState.status.classList.add('is-success');
+  } else if (type === 'error') {
+    commentState.status.classList.add('is-error');
+  }
+}
+
+function updateCommentAvailability() {
+  if (!commentState.form || !commentState.callout) return;
+  const servicesReady = !!(commentState.services && commentState.services.db);
+  const user = commentState.currentUser;
+
+  if (!servicesReady) {
+    commentState.form.hidden = true;
+    commentState.callout.hidden = true;
+    if (commentState.helper && commentState.helperDefault) {
+      commentState.helper.textContent = commentState.helperDefault;
+    }
+    return;
+  }
+
+  if (user) {
+    commentState.form.hidden = false;
+    commentState.callout.hidden = true;
+    if (commentState.helper) {
+      const friendly = user.displayName || deriveNameFromEmail(user.email);
+      commentState.helper.textContent = `Stai commentando come ${friendly}.`;
+    }
+  } else {
+    if (commentState.form && typeof commentState.form.reset === 'function') {
+      commentState.form.reset();
+    }
+    commentState.form.hidden = true;
+    commentState.callout.hidden = false;
+    setCommentFormStatus('', null);
+    if (commentState.helper && commentState.helperDefault) {
+      commentState.helper.textContent = commentState.helperDefault;
+    }
+  }
+}
+
+async function handleCommentSubmit(event) {
+  event.preventDefault();
+  if (!commentState.form || commentState.form.classList.contains('is-submitting')) return;
+
+  if (!commentState.services || !commentState.services.db || !commentState.services.auth) {
+    setCommentFormStatus('Commenti non disponibili al momento. Riprova più tardi.', 'error');
+    return;
+  }
+
+  const user = commentState.currentUser;
+  if (!user || !user.uid) {
+    updateCommentAvailability();
+    setCommentFormStatus('Accedi per lasciare un commento.', 'error');
+    return;
+  }
+
+  const textarea = commentState.textarea;
+  const value = textarea ? textarea.value.trim() : '';
+  if (!value) {
+    setCommentFormStatus('Scrivi qualcosa prima di pubblicare.', 'error');
+    if (textarea) {
+      textarea.focus();
+    }
+    return;
+  }
+
+  commentState.form.classList.add('is-submitting');
+  setCommentFormStatus('Pubblicazione in corso…', null);
+
+  try {
+    const authorName = user.displayName || deriveNameFromEmail(user.email);
+    await commentState.services.db
+      .collection('posts')
+      .doc(commentState.postId)
+      .collection('comments')
+      .add({
+        body: value,
+        authorUid: user.uid,
+        authorEmail: normaliseEmail(user.email),
+        authorName,
+        createdAt: getServerTimestamp(),
+      });
+
+    if (textarea) {
+      textarea.value = '';
+      textarea.focus();
+    }
+    setCommentFormStatus('Commento pubblicato!', 'success');
+    window.setTimeout(() => {
+      setCommentFormStatus('', null);
+    }, 2500);
+  } catch (error) {
+    console.error('Impossibile pubblicare il commento', error);
+    setCommentFormStatus('Impossibile pubblicare il commento. Riprova tra poco.', 'error');
+  } finally {
+    commentState.form.classList.remove('is-submitting');
+  }
+}
+
+function attachCommentListener(services) {
+  if (!services || !services.db || !commentState.postId) return;
+  if (typeof commentState.unsubscribe === 'function') {
+    commentState.unsubscribe();
+    commentState.unsubscribe = null;
+  }
+
+  try {
+    const query = services.db
+      .collection('posts')
+      .doc(commentState.postId)
+      .collection('comments')
+      .orderBy('createdAt', 'desc');
+
+    commentState.unsubscribe = query.onSnapshot(
+      (snapshot) => {
+        const entries = [];
+        snapshot.forEach((doc) => {
+          entries.push({ id: doc.id, ...(doc.data() || {}) });
+        });
+        renderCommentList(entries);
+        updateCommentBanner(null);
+      },
+      (error) => {
+        console.error('Impossibile caricare i commenti', error);
+        updateCommentBanner('Impossibile caricare i commenti. Riprova più tardi.', 'error');
+      },
+    );
+  } catch (error) {
+    console.error('Errore durante la sottoscrizione ai commenti', error);
+    updateCommentBanner('Commenti temporaneamente non disponibili.', 'error');
+  }
+}
+
+function initialiseCommentSystem() {
+  if (commentState.initialised) return;
+  if (!isDateDetailPage()) return;
+
+  const host = document.querySelector('.post-detail');
+  if (!host) return;
+
+  const section = createCommentSection();
+  if (!section) return;
+
+  host.appendChild(section);
+
+  commentState.initialised = true;
+  commentState.postId = slugifyPath(window.location.pathname);
+  commentState.section = section;
+  commentState.list = section.querySelector('.comment-list');
+  commentState.count = section.querySelector('.comment-count');
+  commentState.empty = section.querySelector('.comments-empty');
+  commentState.helper = section.querySelector('.comments-helper');
+  commentState.helperDefault = commentState.helper ? commentState.helper.textContent : '';
+  commentState.form = section.querySelector('.comment-form');
+  commentState.textarea = section.querySelector('textarea[name="comment-body"]');
+  commentState.status = section.querySelector('.comment-status');
+  commentState.callout = section.querySelector('.comment-auth-callout');
+  commentState.loading = section.querySelector('.comments-loading');
+
+  const loginButton = section.querySelector('.comment-login');
+  if (loginButton) {
+    loginButton.addEventListener('click', () => openAuthModal('login'));
+  }
+  const registerButton = section.querySelector('.comment-register');
+  if (registerButton) {
+    registerButton.addEventListener('click', () => openAuthModal('register'));
+  }
+
+  if (commentState.form) {
+    commentState.form.addEventListener('submit', handleCommentSubmit);
+  }
+
+  setCommentCount(0);
+  updateCommentBanner('Caricamento commenti…', 'loading');
+
+  subscribeToAuthChanges((user) => {
+    commentState.currentUser = user || null;
+    updateCommentAvailability();
+  });
+
+  prepareFirebase()
+    .then((services) => {
+      if (!services || !services.db) {
+        updateCommentBanner('Configura Firebase per attivare i commenti.', 'error');
+        return;
+      }
+      commentState.services = services;
+      updateCommentAvailability();
+      attachCommentListener(services);
+    })
+    .catch((error) => {
+      console.error('Impossibile inizializzare i commenti', error);
+      updateCommentBanner('Commenti temporaneamente non disponibili.', 'error');
+    });
+}
+
+window.addEventListener('beforeunload', () => {
+  if (typeof commentState.unsubscribe === 'function') {
+    commentState.unsubscribe();
+  }
+});
+
+
 document.addEventListener('DOMContentLoaded', () => {
   ensureSiteHeader();
   ensureEmailBanner();
   initialiseEmailForms();
   initialiseAuthSystem();
+  initialiseCommentSystem();
   initialiseAdminDashboard();
 });
