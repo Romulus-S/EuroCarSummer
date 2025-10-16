@@ -6,6 +6,154 @@ function slugifyPath(pathname) {
   return base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'home';
 }
 
+const ADMIN_EMAIL = 'romulus@eurocarsummer.com';
+
+const FIREBASE_SCRIPT_SOURCES = [
+  'https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js',
+  'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js',
+];
+
+const loadedScriptPromises = new Map();
+let firebaseConfigPromise = null;
+let firebaseInitPromise = null;
+let firebaseServices = null;
+let firebaseActiveUser = null;
+let firebaseObserverAttached = false;
+const authSubscribers = [];
+
+function loadExternalScript(src) {
+  if (!src) return Promise.reject(new Error('Missing script source'));
+  if (loadedScriptPromises.has(src)) {
+    return loadedScriptPromises.get(src);
+  }
+
+  const promise = new Promise((resolve, reject) => {
+    const existing = Array.from(document.getElementsByTagName('script')).find(
+      (script) => script.src === src,
+    );
+    if (existing) {
+      if (existing.dataset.loaded === 'true') {
+        resolve();
+        return;
+      }
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', (event) => reject(event));
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.defer = true;
+    script.addEventListener('load', () => {
+      script.dataset.loaded = 'true';
+      resolve();
+    });
+    script.addEventListener('error', (event) => {
+      reject(event);
+    });
+    document.head.appendChild(script);
+  });
+
+  loadedScriptPromises.set(src, promise);
+  return promise;
+}
+
+function hasFirebaseConfig(config) {
+  if (!config || typeof config !== 'object') return false;
+  const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'appId'];
+  return requiredKeys.every((key) => typeof config[key] === 'string' && config[key].trim());
+}
+
+async function loadFirebaseConfig() {
+  if (firebaseConfigPromise) {
+    return firebaseConfigPromise;
+  }
+
+  if (window && window.ECS_FIREBASE_CONFIG && hasFirebaseConfig(window.ECS_FIREBASE_CONFIG)) {
+    firebaseConfigPromise = Promise.resolve(window.ECS_FIREBASE_CONFIG);
+    return firebaseConfigPromise;
+  }
+
+  firebaseConfigPromise = fetch('firebase-config.json', { cache: 'no-store' })
+    .then((response) => {
+      if (!response.ok) return null;
+      return response.json().catch(() => null);
+    })
+    .then((config) => {
+      if (hasFirebaseConfig(config)) {
+        return config;
+      }
+      return null;
+    })
+    .catch(() => null);
+
+  return firebaseConfigPromise;
+}
+
+async function prepareFirebase() {
+  if (firebaseInitPromise) {
+    return firebaseInitPromise;
+  }
+
+  firebaseInitPromise = (async () => {
+    const config = await loadFirebaseConfig();
+    if (!config) {
+      return null;
+    }
+
+    for (const src of FIREBASE_SCRIPT_SOURCES) {
+      // eslint-disable-next-line no-await-in-loop
+      await loadExternalScript(src);
+    }
+
+    if (!window.firebase || !window.firebase.apps) {
+      return null;
+    }
+
+    const app = window.firebase.apps.length ? window.firebase.app() : window.firebase.initializeApp(config);
+    const auth = window.firebase.auth();
+    const db = window.firebase.firestore();
+
+    firebaseServices = { config, app, auth, db };
+    return firebaseServices;
+  })().catch((error) => {
+    console.error('Failed to initialise Firebase', error);
+    return null;
+  });
+
+  return firebaseInitPromise;
+}
+
+function notifyAuthSubscribers(user) {
+  authSubscribers.forEach((listener) => {
+    try {
+      listener(user || null);
+    } catch (error) {
+      console.error('Auth subscriber failed', error);
+    }
+  });
+}
+
+function subscribeToAuthChanges(listener) {
+  if (typeof listener !== 'function') return;
+  authSubscribers.push(listener);
+  listener(firebaseActiveUser || null);
+}
+
+function getServerTimestamp() {
+  try {
+    const firestore = window.firebase && window.firebase.firestore;
+    if (firestore && firestore.FieldValue && typeof firestore.FieldValue.serverTimestamp === 'function') {
+      return firestore.FieldValue.serverTimestamp();
+    }
+  } catch (error) {
+    // ignore lookup failures
+  }
+  return new Date().toISOString();
+}
+
 function ensureEmailBanner() {
   if (document.querySelector('.email-banner')) {
     return;
@@ -31,18 +179,7 @@ function ensureEmailBanner() {
   `.trim();
 
   const banner = template.content.firstElementChild;
-  const form = banner.querySelector('form');
-  const label = form.querySelector('label');
-  const input = form.querySelector('input[type="email"]');
-  const slug = slugifyPath(window.location.pathname);
-  const fieldId = `email-${slug || 'home'}`;
-
-  label.setAttribute('for', fieldId);
-  input.id = fieldId;
-
-  const header = document.querySelector('.site-header');
-  const parent = document.body;
-  if (!parent) return;
+@@ -46,79 +194,81 @@ function ensureEmailBanner() {
 
   if (header) {
     parent.insertBefore(banner, header);
@@ -68,6 +205,7 @@ function ensureSiteHeader() {
           <a href="macchina-del-giorno.html">Macchina Del Giorno</a>
           <a href="annunci-esclusivi.html">Annunci Esclusivi</a>
           <a href="aste.html">Aste</a>
+          <a href="admin.html" class="admin-link" hidden>Admin</a>
         </nav>
         <div class="header-actions">
           <button type="button" class="auth-trigger">Accedi / Registrati</button>
@@ -97,6 +235,7 @@ function highlightActiveNav(links) {
     { href: 'macchina-del-giorno.html', match: (value) => value === 'macchina-del-giorno.html' || /^\d{1,2}-\d{1,2}-\d{2}\.html$/i.test(value) },
     { href: 'annunci-esclusivi.html', match: (value) => value === 'annunci-esclusivi.html' },
     { href: 'aste.html', match: (value) => value === 'aste.html' },
+    { href: 'admin.html', match: (value) => value === 'admin.html' },
   ];
 
   patterns.forEach(({ href, match }) => {
@@ -122,98 +261,7 @@ const authStorage = (() => {
     window.localStorage.setItem(testKey, '1');
     window.localStorage.removeItem(testKey);
     return window.localStorage;
-  } catch (error) {
-    return null;
-  }
-})();
-
-let authKeyListenerAttached = false;
-
-function normaliseEmail(email) {
-  return (email || '').trim().toLowerCase();
-}
-
-function loadUsers() {
-  if (!authStorage) return [];
-  try {
-    const raw = authStorage.getItem(AUTH_STORAGE_KEYS.users);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    return [];
-  }
-}
-
-function saveUsers(users) {
-  if (!authStorage) return;
-  try {
-    authStorage.setItem(AUTH_STORAGE_KEYS.users, JSON.stringify(users));
-  } catch (error) {
-    // ignore storage errors
-  }
-}
-
-function getSession() {
-  if (!authStorage) return null;
-  try {
-    const raw = authStorage.getItem(AUTH_STORAGE_KEYS.session);
-    return raw ? JSON.parse(raw) : null;
-  } catch (error) {
-    return null;
-  }
-}
-
-function setSession(user) {
-  if (!authStorage || !user) return;
-  try {
-    authStorage.setItem(
-      AUTH_STORAGE_KEYS.session,
-      JSON.stringify({ userId: user.id, email: user.email, timestamp: Date.now() }),
-    );
-  } catch (error) {
-    // ignore storage errors
-  }
-}
-
-function clearSession() {
-  if (!authStorage) return;
-  try {
-    authStorage.removeItem(AUTH_STORAGE_KEYS.session);
-  } catch (error) {
-    // ignore storage errors
-  }
-}
-
-function getCurrentUser() {
-  const session = getSession();
-  if (!session) return null;
-  const users = loadUsers();
-  const user = users.find((entry) => entry && entry.id === session.userId);
-  if (!user) {
-    clearSession();
-    return null;
-  }
-  return user;
-}
-
-function fallbackHash(value) {
-  return Array.from(value || '')
-    .map((char, index) => (char.charCodeAt(0) + index).toString(16))
-    .join('');
-}
-
-async function hashPassword(password) {
-  const value = password || '';
-  if (window.crypto && window.crypto.subtle && typeof window.crypto.subtle.digest === 'function') {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(value);
-    const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
-    return Array.from(new Uint8Array(hashBuffer))
-      .map((byte) => byte.toString(16).padStart(2, '0'))
-      .join('');
-  }
-  return fallbackHash(value);
+@@ -217,50 +367,104 @@ async function hashPassword(password) {
 }
 
 function createUser({ email, passwordHash, displayName }) {
@@ -237,6 +285,60 @@ function deriveNameFromEmail(email) {
   const [localPart] = normalised.split('@');
   if (!localPart) return normalised;
   return localPart.charAt(0).toUpperCase() + localPart.slice(1);
+}
+
+function mapFirebaseUser(user) {
+  if (!user) return null;
+  return {
+    uid: user.uid,
+    email: normaliseEmail(user.email),
+    displayName: user.displayName || '',
+    emailVerified: !!user.emailVerified,
+    isFirebase: true,
+  };
+}
+
+async function ensureUserDocument(services, user, overrides = {}) {
+  if (!services || !services.db || !user) return null;
+  try {
+    const docRef = services.db.collection('users').doc(user.uid);
+    const snapshot = await docRef.get();
+    const basePayload = {
+      email: normaliseEmail(user.email),
+      displayName: user.displayName || deriveNameFromEmail(user.email),
+      emailVerified: !!user.emailVerified,
+      role: normaliseEmail(user.email) === ADMIN_EMAIL ? 'admin' : 'member',
+      updatedAt: getServerTimestamp(),
+      ...overrides,
+    };
+
+    if (snapshot.exists) {
+      await docRef.set(basePayload, { merge: true });
+    } else {
+      await docRef.set({
+        createdAt: getServerTimestamp(),
+        ...basePayload,
+      });
+    }
+    return docRef;
+  } catch (error) {
+    console.error('Failed to persist user document', error);
+    return null;
+  }
+}
+
+async function sendVerificationEmail(user) {
+  if (!user || typeof user.sendEmailVerification !== 'function') return;
+  const currentOrigin = window.location.origin || `${window.location.protocol}//${window.location.host}`;
+  const continueUrl = `${currentOrigin.replace(/\/$/, '')}/verify.html`;
+  try {
+    await user.sendEmailVerification({ url: continueUrl });
+  } catch (error) {
+    console.warn('Verification email with custom URL failed, falling back to default link.', error);
+    await user.sendEmailVerification().catch((innerError) => {
+      console.error('Unable to send verification email', innerError);
+    });
+  }
 }
 
 function ensureAuthModal() {
@@ -264,115 +366,7 @@ function ensureAuthModal() {
           <p class="auth-switch">Non hai un account? <button type="button" data-switch-to="register">Registrati</button></p>
         </form>
         <form class="auth-form" data-mode="register" autocomplete="on" hidden>
-          <h2 id="auth-heading-register">Registrati</h2>
-          <p>Crea un account gratuito per ricevere aggiornamenti e partecipare alle aste esclusive.</p>
-          <label>
-            Nome (facoltativo)
-            <input type="text" name="register-name" autocomplete="name" maxlength="60">
-          </label>
-          <label>
-            Indirizzo email
-            <input type="email" name="register-email" autocomplete="email" required>
-          </label>
-          <label>
-            Password
-            <input type="password" name="register-password" autocomplete="new-password" required minlength="6">
-          </label>
-          <label>
-            Conferma password
-            <input type="password" name="register-confirm" autocomplete="new-password" required minlength="6">
-          </label>
-          <p class="auth-feedback" role="status" aria-live="polite"></p>
-          <button type="submit">Crea account</button>
-          <p class="auth-switch">Hai già un account? <button type="button" data-switch-to="login">Accedi</button></p>
-        </form>
-      </div>
-    </div>
-  `.trim();
-
-  modal = template.content.firstElementChild;
-  if (!modal) return null;
-
-  modal.addEventListener('click', (event) => {
-    if (event.target === modal) {
-      closeAuthModal();
-    }
-  });
-
-  const dialog = modal.querySelector('.auth-dialog');
-  if (dialog) {
-    dialog.addEventListener('click', (event) => {
-      event.stopPropagation();
-    });
-  }
-
-  document.body.appendChild(modal);
-  return modal;
-}
-
-function resetAuthForms() {
-  const modal = document.querySelector('.auth-modal');
-  if (!modal) return;
-  const forms = modal.querySelectorAll('.auth-form');
-  forms.forEach((form) => {
-    if (typeof form.reset === 'function') {
-      form.reset();
-    }
-    showAuthMessage(form, '', null);
-  });
-}
-
-function switchAuthMode(mode) {
-  const modal = document.querySelector('.auth-modal');
-  if (!modal) return;
-  const desiredMode = mode === 'register' ? 'register' : 'login';
-  modal.dataset.mode = desiredMode;
-  const forms = modal.querySelectorAll('.auth-form');
-  const dialog = modal.querySelector('.auth-dialog');
-
-  forms.forEach((form) => {
-    const isActive = form.dataset.mode === desiredMode;
-    if (isActive) {
-      form.removeAttribute('hidden');
-      const heading = form.querySelector('h2[id]');
-      if (dialog && heading) {
-        dialog.setAttribute('aria-labelledby', heading.id);
-      }
-    } else {
-      form.setAttribute('hidden', '');
-    }
-  });
-}
-
-function focusAuthField(mode) {
-  const modal = document.querySelector('.auth-modal');
-  if (!modal) return;
-  const form = modal.querySelector(`.auth-form[data-mode="${mode}"]`);
-  if (!form) return;
-  const field = form.querySelector('input:not([type="hidden"]):not([disabled])');
-  if (field) {
-    field.focus();
-  }
-}
-
-function openAuthModal(mode = 'login') {
-  const modal = ensureAuthModal();
-  if (!modal) return;
-  resetAuthForms();
-  switchAuthMode(mode);
-  modal.hidden = false;
-  requestAnimationFrame(() => {
-    modal.classList.add('is-visible');
-    focusAuthField(mode);
-  });
-  document.body.classList.add('auth-modal-open');
-}
-
-function closeAuthModal() {
-  const modal = document.querySelector('.auth-modal');
-  if (!modal || modal.hidden) return;
-  modal.classList.remove('is-visible');
-  document.body.classList.remove('auth-modal-open');
+@@ -376,230 +580,335 @@ function closeAuthModal() {
   window.setTimeout(() => {
     modal.hidden = true;
     resetAuthForms();
@@ -398,11 +392,6 @@ async function handleLoginSubmit(event) {
   const emailInput = form.querySelector('input[name="login-email"]');
   const passwordInput = form.querySelector('input[name="login-password"]');
 
-  if (!authStorage) {
-    showAuthMessage(form, 'Il salvataggio locale non è disponibile su questo dispositivo.', 'error');
-    return;
-  }
-
   const emailValue = normaliseEmail(emailInput ? emailInput.value : '');
   const passwordValue = passwordInput ? passwordInput.value : '';
 
@@ -418,33 +407,63 @@ async function handleLoginSubmit(event) {
     return;
   }
 
-  const users = loadUsers();
-  const user = users.find((entry) => entry && entry.email === emailValue);
-  if (!user) {
-    showAuthMessage(form, 'Nessun account trovato per questa email.', 'error');
-    if (emailInput) emailInput.focus();
-    return;
-  }
-
   try {
-    const passwordHash = await hashPassword(passwordValue);
-    if (user.passwordHash !== passwordHash) {
-      showAuthMessage(form, 'Password non corretta. Riprova.', 'error');
-      if (passwordInput) passwordInput.focus();
+    const services = await prepareFirebase();
+    if (!services || !services.auth) {
+      showAuthMessage(
+        form,
+        'Il sistema di autenticazione non è disponibile. Riprovare tra qualche istante.',
+        'error',
+      );
       return;
     }
-  } catch (error) {
-    showAuthMessage(form, 'Impossibile verificare le credenziali. Riprova.', 'error');
-    return;
-  }
 
-  setSession(user);
-  showAuthMessage(form, 'Accesso effettuato, bentornato!', 'success');
-  form.reset();
-  updateAuthUI();
-  window.setTimeout(() => {
-    closeAuthModal();
-  }, 400);
+    showAuthMessage(form, 'Accesso in corso…', null);
+    const credentials = await services.auth.signInWithEmailAndPassword(emailValue, passwordValue);
+    const user = credentials.user;
+    if (!user) {
+      showAuthMessage(form, 'Impossibile completare l\'accesso. Riprova.', 'error');
+      return;
+    }
+
+    await user.reload();
+    if (!user.emailVerified) {
+      await sendVerificationEmail(user);
+      await services.auth.signOut();
+      showAuthMessage(
+        form,
+        'Abbiamo inviato una nuova email di conferma. Verifica il tuo indirizzo prima di accedere.',
+        'error',
+      );
+      return;
+    }
+
+    await ensureUserDocument(services, user, {
+      emailVerified: true,
+      lastLoginAt: getServerTimestamp(),
+    });
+
+    showAuthMessage(form, 'Accesso effettuato, bentornato!', 'success');
+    form.reset();
+    window.setTimeout(() => {
+      closeAuthModal();
+    }, 400);
+  } catch (error) {
+    const code = error && error.code ? String(error.code) : '';
+    let message = 'Impossibile verificare le credenziali. Riprova.';
+    if (code === 'auth/user-not-found') {
+      message = 'Nessun account trovato per questa email.';
+      if (emailInput) emailInput.focus();
+    } else if (code === 'auth/wrong-password') {
+      message = 'Password non corretta. Riprova.';
+      if (passwordInput) passwordInput.focus();
+    } else if (code === 'auth/too-many-requests') {
+      message = 'Troppi tentativi di accesso. Attendi qualche minuto e riprova.';
+    } else if (code === 'auth/network-request-failed') {
+      message = 'Connessione assente o instabile. Controlla la rete e riprova.';
+    }
+    showAuthMessage(form, message, 'error');
+  }
 }
 
 async function handleRegisterSubmit(event) {
@@ -454,11 +473,6 @@ async function handleRegisterSubmit(event) {
   const emailInput = form.querySelector('input[name="register-email"]');
   const passwordInput = form.querySelector('input[name="register-password"]');
   const confirmInput = form.querySelector('input[name="register-confirm"]');
-
-  if (!authStorage) {
-    showAuthMessage(form, 'La registrazione non è disponibile su questo dispositivo.', 'error');
-    return;
-  }
 
   const emailValue = normaliseEmail(emailInput ? emailInput.value : '');
   const passwordValue = passwordInput ? passwordInput.value : '';
@@ -486,39 +500,108 @@ async function handleRegisterSubmit(event) {
     return;
   }
 
-  const users = loadUsers();
-  const existingUser = users.find((entry) => entry && entry.email === emailValue);
-  if (existingUser) {
-    showAuthMessage(form, 'Esiste già un account con questa email.', 'error');
-    if (emailInput) emailInput.focus();
-    return;
-  }
-
   try {
-    const passwordHash = await hashPassword(passwordValue);
-    const newUser = createUser({
-      email: emailValue,
-      passwordHash,
-      displayName: nameInput ? nameInput.value : '',
+    const services = await prepareFirebase();
+    if (!services || !services.auth) {
+      showAuthMessage(
+        form,
+        'Il sistema di registrazione non è disponibile al momento. Riprova più tardi.',
+        'error',
+      );
+      return;
+    }
+
+    showAuthMessage(form, 'Creazione account in corso…', null);
+    const credentials = await services.auth.createUserWithEmailAndPassword(emailValue, passwordValue);
+    const user = credentials.user;
+    if (!user) {
+      showAuthMessage(form, 'Registrazione non riuscita. Riprova.', 'error');
+      return;
+    }
+
+    const displayName = nameInput ? nameInput.value.trim() : '';
+    if (displayName) {
+      await user.updateProfile({ displayName });
+    }
+
+    await ensureUserDocument(services, user, {
+      displayName: displayName || deriveNameFromEmail(user.email),
+      emailVerified: false,
     });
-    users.push(newUser);
-    saveUsers(users);
-    setSession(newUser);
-    showAuthMessage(form, 'Registrazione completata! Accesso effettuato.', 'success');
+    await sendVerificationEmail(user);
+
+    showAuthMessage(
+      form,
+      'Registrazione completata! Controlla la posta e conferma il tuo indirizzo per accedere.',
+      'success',
+    );
+
     form.reset();
-    updateAuthUI();
+
     window.setTimeout(() => {
-      closeAuthModal();
-    }, 500);
+      switchAuthMode('login');
+      focusAuthField('login');
+    }, 400);
+
+    await services.auth.signOut();
   } catch (error) {
-    showAuthMessage(form, 'Impossibile completare la registrazione. Riprova.', 'error');
+    const code = error && error.code ? String(error.code) : '';
+    let message = 'Impossibile completare la registrazione. Riprova.';
+    if (code === 'auth/email-already-in-use') {
+      message = 'Esiste già un account con questa email.';
+      if (emailInput) emailInput.focus();
+    } else if (code === 'auth/weak-password') {
+      message = 'La password scelta è troppo debole. Usa una combinazione più sicura.';
+      if (passwordInput) passwordInput.focus();
+    } else if (code === 'auth/invalid-email') {
+      message = 'L\'indirizzo email non è valido.';
+      if (emailInput) emailInput.focus();
+    } else if (code === 'auth/network-request-failed') {
+      message = 'Connessione assente o instabile. Controlla la rete e riprova.';
+    }
+    showAuthMessage(form, message, 'error');
   }
 }
 
 function handleLogout(event) {
-  event.preventDefault();
-  clearSession();
-  updateAuthUI();
+  if (event) {
+    event.preventDefault();
+  }
+
+  const completeSignOut = () => {
+    clearSession();
+    firebaseActiveUser = null;
+    updateAuthUI();
+    notifyAuthSubscribers(null);
+  };
+
+  const signOutFirebase = () => {
+    if (firebaseServices && firebaseServices.auth) {
+      firebaseServices.auth
+        .signOut()
+        .then(() => {
+          completeSignOut();
+        })
+        .catch((error) => {
+          console.error('Errore durante il logout', error);
+          completeSignOut();
+        });
+      return true;
+    }
+    return false;
+  };
+
+  if (!signOutFirebase()) {
+    prepareFirebase()
+      .then(() => {
+        if (!signOutFirebase()) {
+          completeSignOut();
+        }
+      })
+      .catch(() => {
+        completeSignOut();
+      });
+  }
 }
 
 function updateAuthUI() {
@@ -531,11 +614,17 @@ function updateAuthUI() {
   const userInfo = actions.querySelector('.user-info');
   const logoutButton = actions.querySelector('.logout-button');
   const nameTarget = actions.querySelector('.user-name');
+  const adminLink = header.querySelector('nav .admin-link');
 
-  if (!authStorage) {
+  const hasFirebase = !!(firebaseServices && firebaseServices.auth);
+  const canUseLocal = hasFirebase ? !!authStorage : false;
+  const canAuthenticate = hasFirebase || canUseLocal;
+
+  if (!canAuthenticate) {
     if (trigger) {
       trigger.disabled = true;
       trigger.textContent = 'Accesso non disponibile';
+      trigger.hidden = false;
     }
     if (userInfo) {
       userInfo.hidden = true;
@@ -543,10 +632,15 @@ function updateAuthUI() {
     if (logoutButton) {
       logoutButton.disabled = true;
     }
+    if (adminLink) {
+      adminLink.hidden = true;
+    }
     return;
   }
 
-  const user = getCurrentUser();
+  const localUser = canUseLocal ? getCurrentUser() : null;
+  const user = firebaseActiveUser || localUser;
+
   if (user) {
     if (trigger) {
       trigger.hidden = true;
@@ -578,6 +672,11 @@ function updateAuthUI() {
       logoutButton.disabled = false;
     }
   }
+
+  if (adminLink) {
+    const isAdmin = !!(user && normaliseEmail(user.email) === ADMIN_EMAIL);
+    adminLink.hidden = !isAdmin;
+  }
 }
 
 function initialiseAuthSystem() {
@@ -603,22 +702,7 @@ function initialiseAuthSystem() {
   if (modal.dataset.initialised !== 'true') {
     const closeButton = modal.querySelector('.auth-close');
     if (closeButton) {
-      closeButton.addEventListener('click', () => closeAuthModal());
-    }
-
-    const switchers = modal.querySelectorAll('[data-switch-to]');
-    switchers.forEach((button) => {
-      if (button.dataset.initialised === 'true') return;
-      button.addEventListener('click', () => {
-        const targetMode = button.dataset.switchTo === 'register' ? 'register' : 'login';
-        switchAuthMode(targetMode);
-        focusAuthField(targetMode);
-      });
-      button.dataset.initialised = 'true';
-    });
-
-    const loginForm = modal.querySelector('.auth-form[data-mode="login"]');
-    const registerForm = modal.querySelector('.auth-form[data-mode="register"]');
+@@ -622,50 +931,79 @@ function initialiseAuthSystem() {
 
     if (loginForm && loginForm.dataset.initialised !== 'true') {
       loginForm.addEventListener('submit', handleLoginSubmit);
@@ -644,6 +728,35 @@ function initialiseAuthSystem() {
 
   switchAuthMode('login');
   updateAuthUI();
+
+  prepareFirebase()
+    .then((services) => {
+      if (services && services.auth) {
+        firebaseServices = services;
+        if (!firebaseObserverAttached) {
+          firebaseObserverAttached = true;
+          services.auth.onAuthStateChanged(async (user) => {
+            firebaseActiveUser = mapFirebaseUser(user);
+            updateAuthUI();
+            notifyAuthSubscribers(firebaseActiveUser);
+
+            if (user) {
+              await ensureUserDocument(services, user, {
+                emailVerified: !!user.emailVerified,
+                lastSeenAt: getServerTimestamp(),
+              });
+            }
+          });
+        } else {
+          updateAuthUI();
+        }
+      } else {
+        updateAuthUI();
+      }
+    })
+    .catch(() => {
+      updateAuthUI();
+    });
 }
 
 function updateStatus(helper, message, type) {
@@ -669,34 +782,7 @@ function initialiseEmailForms() {
 
     if (helper) {
       helper.setAttribute('role', 'status');
-      helper.setAttribute('aria-live', 'polite');
-    }
-
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-
-      if (!emailInput || !emailInput.value) {
-        updateStatus(helper, 'Inserisci un indirizzo email valido.', 'error');
-        return;
-      }
-
-      const emailValue = emailInput.value.trim();
-      if (!emailValue) {
-        updateStatus(helper, 'Inserisci un indirizzo email valido.', 'error');
-        return;
-      }
-
-      form.classList.add('is-submitting');
-      updateStatus(helper, 'Invio in corso…', null);
-
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({
+@@ -700,31 +1038,150 @@ function initialiseEmailForms() {
             email: emailValue,
             _subject: 'Nuova richiesta Euro Car Summer',
           }),
@@ -722,9 +808,128 @@ function initialiseEmailForms() {
   });
 }
 
+function initialiseAdminDashboard() {
+  const dashboard = document.querySelector('.admin-dashboard');
+  if (!dashboard || dashboard.dataset.initialised === 'true') return;
+  dashboard.dataset.initialised = 'true';
+
+  const statusEl = dashboard.querySelector('.admin-status');
+  const table = dashboard.querySelector('.admin-table');
+  const tbody = table ? table.querySelector('tbody') : null;
+  const refreshButton = dashboard.querySelector('.admin-refresh');
+
+  const setStatus = (message, type) => {
+    if (!statusEl) return;
+    statusEl.textContent = message;
+    if (type) {
+      statusEl.dataset.state = type;
+    } else if (statusEl.dataset) {
+      delete statusEl.dataset.state;
+    }
+  };
+
+  const toggleTable = (visible) => {
+    if (table) {
+      table.hidden = !visible;
+    }
+  };
+
+  let currentAdminUser = null;
+
+  const renderAccounts = async (showLoading = true) => {
+    const services = await prepareFirebase();
+    if (!services || !services.db) {
+      setStatus('Configura Firebase per attivare la dashboard amministratore.', 'error');
+      toggleTable(false);
+      return;
+    }
+
+    if (!currentAdminUser || normaliseEmail(currentAdminUser.email) !== ADMIN_EMAIL) {
+      toggleTable(false);
+      return;
+    }
+
+    if (showLoading) {
+      setStatus('Caricamento account…', 'loading');
+    }
+
+    try {
+      const snapshot = await services.db.collection('users').orderBy('createdAt', 'desc').get();
+      if (!tbody) return;
+
+      tbody.innerHTML = '';
+
+      if (snapshot.empty) {
+        toggleTable(false);
+        setStatus('Nessun account registrato finora.', 'info');
+        return;
+      }
+
+      const formatDate = (value) => {
+        if (!value) return '—';
+        try {
+          if (value.toDate) {
+            return value.toDate().toLocaleString();
+          }
+          return new Date(value).toLocaleString();
+        } catch (error) {
+          return '—';
+        }
+      };
+
+      snapshot.forEach((doc) => {
+        const data = doc.data() || {};
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${data.displayName || '—'}</td>
+          <td>${data.email || '—'}</td>
+          <td>${data.role || 'member'}</td>
+          <td>${data.emailVerified ? '✔️' : '—'}</td>
+          <td>${formatDate(data.createdAt)}</td>
+          <td>${formatDate(data.lastSeenAt || data.updatedAt)}</td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      toggleTable(true);
+      setStatus(`Account totali: ${snapshot.size}`, 'success');
+    } catch (error) {
+      console.error('Impossibile caricare gli account', error);
+      toggleTable(false);
+      setStatus('Impossibile caricare gli account. Riprova più tardi.', 'error');
+    }
+  };
+
+  if (refreshButton && refreshButton.dataset.initialised !== 'true') {
+    refreshButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      renderAccounts();
+    });
+    refreshButton.dataset.initialised = 'true';
+  }
+
+  subscribeToAuthChanges((user) => {
+    currentAdminUser = user;
+    if (!user) {
+      toggleTable(false);
+      setStatus('Accedi con l\'account amministratore per consultare gli utenti.', 'info');
+      return;
+    }
+
+    if (normaliseEmail(user.email) !== ADMIN_EMAIL) {
+      toggleTable(false);
+      setStatus('Questo pannello è riservato a Romulus (romulus@eurocarsummer.com).', 'error');
+      return;
+    }
+
+    renderAccounts();
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   ensureSiteHeader();
   ensureEmailBanner();
   initialiseEmailForms();
   initialiseAuthSystem();
+  initialiseAdminDashboard();
 });
