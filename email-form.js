@@ -35,6 +35,9 @@ const commentState = {
 
 const LOCAL_COMMENT_KEY_PREFIX = 'ecsComments:';
 
+let chromeBootstrapped = false;
+let chromeBootstrapScheduled = false;
+
 const FIREBASE_SCRIPT_SOURCES = [
   'https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js',
@@ -222,6 +225,8 @@ function getServerTimestamp() {
 }
 
 function ensureEmailBanner() {
+  ensureSiteHeader();
+
   if (document.querySelector('.email-banner')) {
     return;
   }
@@ -246,7 +251,18 @@ function ensureEmailBanner() {
   `.trim();
 
   const banner = template.content.firstElementChild;
-@@ -46,79 +194,81 @@ function ensureEmailBanner() {
+  const form = banner.querySelector('form');
+  const label = form.querySelector('label');
+  const input = form.querySelector('input[type="email"]');
+  const slug = slugifyPath(window.location.pathname);
+  const fieldId = `email-${slug || 'home'}`;
+
+  label.setAttribute('for', fieldId);
+  input.id = fieldId;
+
+  const header = document.querySelector('.site-header');
+  const parent = document.body;
+  if (!parent) return;
 
   if (header) {
     parent.insertBefore(banner, header);
@@ -328,7 +344,98 @@ const authStorage = (() => {
     window.localStorage.setItem(testKey, '1');
     window.localStorage.removeItem(testKey);
     return window.localStorage;
-@@ -217,50 +367,104 @@ async function hashPassword(password) {
+  } catch (error) {
+    return null;
+  }
+})();
+
+let authKeyListenerAttached = false;
+
+function normaliseEmail(email) {
+  return (email || '').trim().toLowerCase();
+}
+
+function loadUsers() {
+  if (!authStorage) return [];
+  try {
+    const raw = authStorage.getItem(AUTH_STORAGE_KEYS.users);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveUsers(users) {
+  if (!authStorage) return;
+  try {
+    authStorage.setItem(AUTH_STORAGE_KEYS.users, JSON.stringify(users));
+  } catch (error) {
+    // ignore storage errors
+  }
+}
+
+function getSession() {
+  if (!authStorage) return null;
+  try {
+    const raw = authStorage.getItem(AUTH_STORAGE_KEYS.session);
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function setSession(user) {
+  if (!authStorage || !user) return;
+  try {
+    authStorage.setItem(
+      AUTH_STORAGE_KEYS.session,
+      JSON.stringify({ userId: user.id, email: user.email, timestamp: Date.now() }),
+    );
+  } catch (error) {
+    // ignore storage errors
+  }
+}
+
+function clearSession() {
+  if (!authStorage) return;
+  try {
+    authStorage.removeItem(AUTH_STORAGE_KEYS.session);
+  } catch (error) {
+    // ignore storage errors
+  }
+}
+
+function getCurrentUser() {
+  const session = getSession();
+  if (!session) return null;
+  const users = loadUsers();
+  const user = users.find((entry) => entry && entry.id === session.userId);
+  if (!user) {
+    clearSession();
+    return null;
+  }
+  return user;
+}
+
+function fallbackHash(value) {
+  return Array.from(value || '')
+    .map((char, index) => (char.charCodeAt(0) + index).toString(16))
+    .join('');
+}
+
+async function hashPassword(password) {
+  const value = password || '';
+  if (window.crypto && window.crypto.subtle && typeof window.crypto.subtle.digest === 'function') {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(value);
+    const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hashBuffer))
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('');
+  }
+  return fallbackHash(value);
 }
 
 function createUser({ email, passwordHash, displayName }) {
@@ -433,7 +540,115 @@ function ensureAuthModal() {
           <p class="auth-switch">Non hai un account? <button type="button" data-switch-to="register">Registrati</button></p>
         </form>
         <form class="auth-form" data-mode="register" autocomplete="on" hidden>
-@@ -376,230 +580,335 @@ function closeAuthModal() {
+          <h2 id="auth-heading-register">Registrati</h2>
+          <p>Crea un account gratuito per ricevere aggiornamenti e partecipare alle aste esclusive.</p>
+          <label>
+            Nome (facoltativo)
+            <input type="text" name="register-name" autocomplete="name" maxlength="60">
+          </label>
+          <label>
+            Indirizzo email
+            <input type="email" name="register-email" autocomplete="email" required>
+          </label>
+          <label>
+            Password
+            <input type="password" name="register-password" autocomplete="new-password" required minlength="6">
+          </label>
+          <label>
+            Conferma password
+            <input type="password" name="register-confirm" autocomplete="new-password" required minlength="6">
+          </label>
+          <p class="auth-feedback" role="status" aria-live="polite"></p>
+          <button type="submit">Crea account</button>
+          <p class="auth-switch">Hai già un account? <button type="button" data-switch-to="login">Accedi</button></p>
+        </form>
+      </div>
+    </div>
+  `.trim();
+
+  modal = template.content.firstElementChild;
+  if (!modal) return null;
+
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) {
+      closeAuthModal();
+    }
+  });
+
+  const dialog = modal.querySelector('.auth-dialog');
+  if (dialog) {
+    dialog.addEventListener('click', (event) => {
+      event.stopPropagation();
+    });
+  }
+
+  document.body.appendChild(modal);
+  return modal;
+}
+
+function resetAuthForms() {
+  const modal = document.querySelector('.auth-modal');
+  if (!modal) return;
+  const forms = modal.querySelectorAll('.auth-form');
+  forms.forEach((form) => {
+    if (typeof form.reset === 'function') {
+      form.reset();
+    }
+    showAuthMessage(form, '', null);
+  });
+}
+
+function switchAuthMode(mode) {
+  const modal = document.querySelector('.auth-modal');
+  if (!modal) return;
+  const desiredMode = mode === 'register' ? 'register' : 'login';
+  modal.dataset.mode = desiredMode;
+  const forms = modal.querySelectorAll('.auth-form');
+  const dialog = modal.querySelector('.auth-dialog');
+
+  forms.forEach((form) => {
+    const isActive = form.dataset.mode === desiredMode;
+    if (isActive) {
+      form.removeAttribute('hidden');
+      const heading = form.querySelector('h2[id]');
+      if (dialog && heading) {
+        dialog.setAttribute('aria-labelledby', heading.id);
+      }
+    } else {
+      form.setAttribute('hidden', '');
+    }
+  });
+}
+
+function focusAuthField(mode) {
+  const modal = document.querySelector('.auth-modal');
+  if (!modal) return;
+  const form = modal.querySelector(`.auth-form[data-mode="${mode}"]`);
+  if (!form) return;
+  const field = form.querySelector('input:not([type="hidden"]):not([disabled])');
+  if (field) {
+    field.focus();
+  }
+}
+
+function openAuthModal(mode = 'login') {
+  const modal = ensureAuthModal();
+  if (!modal) return;
+  resetAuthForms();
+  switchAuthMode(mode);
+  modal.hidden = false;
+  requestAnimationFrame(() => {
+    modal.classList.add('is-visible');
+    focusAuthField(mode);
+  });
+  document.body.classList.add('auth-modal-open');
+}
+
+function closeAuthModal() {
+  const modal = document.querySelector('.auth-modal');
+  if (!modal || modal.hidden) return;
+  modal.classList.remove('is-visible');
+  document.body.classList.remove('auth-modal-open');
   window.setTimeout(() => {
     modal.hidden = true;
     resetAuthForms();
@@ -769,7 +984,22 @@ function initialiseAuthSystem() {
   if (modal.dataset.initialised !== 'true') {
     const closeButton = modal.querySelector('.auth-close');
     if (closeButton) {
-@@ -622,50 +931,79 @@ function initialiseAuthSystem() {
+      closeButton.addEventListener('click', () => closeAuthModal());
+    }
+
+    const switchers = modal.querySelectorAll('[data-switch-to]');
+    switchers.forEach((button) => {
+      if (button.dataset.initialised === 'true') return;
+      button.addEventListener('click', () => {
+        const targetMode = button.dataset.switchTo === 'register' ? 'register' : 'login';
+        switchAuthMode(targetMode);
+        focusAuthField(targetMode);
+      });
+      button.dataset.initialised = 'true';
+    });
+
+    const loginForm = modal.querySelector('.auth-form[data-mode="login"]');
+    const registerForm = modal.querySelector('.auth-form[data-mode="register"]');
 
     if (loginForm && loginForm.dataset.initialised !== 'true') {
       loginForm.addEventListener('submit', handleLoginSubmit);
@@ -849,7 +1079,34 @@ function initialiseEmailForms() {
 
     if (helper) {
       helper.setAttribute('role', 'status');
-@@ -700,31 +1038,150 @@ function initialiseEmailForms() {
+      helper.setAttribute('aria-live', 'polite');
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      if (!emailInput || !emailInput.value) {
+        updateStatus(helper, 'Inserisci un indirizzo email valido.', 'error');
+        return;
+      }
+
+      const emailValue = emailInput.value.trim();
+      if (!emailValue) {
+        updateStatus(helper, 'Inserisci un indirizzo email valido.', 'error');
+        return;
+      }
+
+      form.classList.add('is-submitting');
+      updateStatus(helper, 'Invio in corso…', null);
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({
             email: emailValue,
             _subject: 'Nuova richiesta Euro Car Summer',
           }),
@@ -1172,7 +1429,7 @@ function updateCommentAvailability() {
   const servicesReady = !!(commentState.services && commentState.services.db);
   const user = commentState.currentUser;
 
-   if (!servicesReady && !commentState.useLocal) {
+  if (!servicesReady && !commentState.useLocal) {
     commentState.form.hidden = true;
     commentState.callout.hidden = true;
     if (commentState.helper && commentState.helperDefault) {
@@ -1198,7 +1455,6 @@ function updateCommentAvailability() {
     }
     return;
   }
-
 
   if (user) {
     commentState.form.hidden = false;
@@ -1238,12 +1494,7 @@ async function handleCommentSubmit(event) {
   event.preventDefault();
   if (!commentState.form || commentState.form.classList.contains('is-submitting')) return;
 
-  if (!commentState.services || !commentState.services.db || !commentState.services.auth) {
-    setCommentFormStatus('Commenti non disponibili al momento. Riprova più tardi.', 'error');
-    return;
-  }
-
-const textarea = commentState.textarea;
+  const textarea = commentState.textarea;
   const value = textarea ? textarea.value.trim() : '';
   if (!value) {
     setCommentFormStatus('Scrivi qualcosa prima di pubblicare.', 'error');
@@ -1296,6 +1547,11 @@ const textarea = commentState.textarea;
     if (textarea) {
       textarea.focus();
     }
+    return;
+  }
+
+  if (!commentState.services || !commentState.services.db || !commentState.services.auth) {
+    setCommentFormStatus('Commenti non disponibili al momento. Riprova più tardi.', 'error');
     return;
   }
 
@@ -1444,6 +1700,7 @@ function initialiseCommentSystem() {
           }
         }
         updateCommentAvailability();
+        return;
       }
       commentState.services = services;
       updateCommentAvailability();
@@ -1461,8 +1718,28 @@ window.addEventListener('beforeunload', () => {
   }
 });
 
-
 function bootstrapSiteChrome() {
+  if (chromeBootstrapped) {
+    return;
+  }
+
+  if (!document.body) {
+    if (!chromeBootstrapScheduled) {
+      chromeBootstrapScheduled = true;
+      document.addEventListener(
+        'DOMContentLoaded',
+        () => {
+          chromeBootstrapScheduled = false;
+          bootstrapSiteChrome();
+        },
+        { once: true },
+      );
+    }
+    return;
+  }
+
+  chromeBootstrapped = true;
+
   ensureSiteHeader();
   ensureEmailBanner();
   initialiseEmailForms();
