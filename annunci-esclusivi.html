@@ -11,8 +11,8 @@
             font-family: 'Trebuchet MS', sans-serif;
             margin: 0;
             line-height: 1.6;
-            background-color: #f4f6f8;
-            color: #111827;
+            background: linear-gradient(180deg, rgba(var(--brand-navy-rgb), 0.06), rgba(255, 143, 63, 0.08));
+            color: var(--text-primary);
         }
         main {
             max-width: 960px;
@@ -20,7 +20,7 @@
             padding: 0 1.5rem 3rem;
         }
         h1 {
-            color: #0b1f33;
+            color: var(--brand-navy);
         }
         .grid {
             display: grid;
@@ -29,10 +29,11 @@
             margin-top: 2rem;
         }
         article {
-            background: white;
-            border-radius: 12px;
+            background: #ffffff;
+            border-radius: 14px;
             padding: 1.5rem;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(var(--brand-navy-rgb), 0.08);
+            box-shadow: 0 20px 40px -28px rgba(var(--brand-navy-rgb), 0.4);
         }
         article img {
             width: 100%;
@@ -42,12 +43,17 @@
         article h2 {
             font-size: 1.25rem;
             margin-bottom: 0.5rem;
-            color: #0b1f33;
+            color: var(--brand-navy);
         }
         article a {
-            color: #0b1f33;
+            color: var(--brand-sunrise);
             text-decoration: none;
             font-weight: bold;
+        }
+ 
+        article a:hover,
+        article a:focus-visible {
+            color: var(--brand-sky);
         }
     </style>
 </head>
