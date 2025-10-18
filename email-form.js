@@ -836,7 +836,7 @@ async function handleRegisterSubmit(event) {
       message = 'La password scelta è troppo debole. Usa una combinazione più sicura.';
       if (passwordInput) passwordInput.focus();
     } else if (code === 'auth/invalid-email') {
-      message = 'L\'indirizzo email non è valido.';
+      message = "L'indirizzo email non è valido.";
       if (emailInput) emailInput.focus();
     } else if (code === 'auth/network-request-failed') {
       message = 'Connessione assente o instabile. Controlla la rete e riprova.';
@@ -1515,9 +1515,11 @@ function updateCommentAvailability() {
     }
     if (commentState.nameInput) {
       commentState.nameInput.disabled = false;
+      commentState.nameInput.value = commentState.nameInput.value;
     }
     if (commentState.emailInput) {
       commentState.emailInput.disabled = false;
+      commentState.emailInput.value = commentState.emailInput.value;
     }
     return;
   }
