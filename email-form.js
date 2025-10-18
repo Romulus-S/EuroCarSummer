@@ -1212,6 +1212,7 @@ function initialiseAdminDashboard() {
   const table = dashboard.querySelector('.admin-table');
   const tbody = table ? table.querySelector('tbody') : null;
   const refreshButton = dashboard.querySelector('.admin-refresh');
+  const helpPanel = dashboard.querySelector('.admin-help');
 
   const setStatus = (message, type) => {
     if (!statusEl) return;
@@ -1221,6 +1222,16 @@ function initialiseAdminDashboard() {
     } else if (statusEl.dataset) {
       delete statusEl.dataset.state;
     }
+  };
+
+  const showHelp = (visible) => {
+    if (!helpPanel) return;
+    helpPanel.hidden = !visible;
+    if (!visible) {
+      helpPanel.open = false;
+      return;
+    }
+    helpPanel.open = true;
   };
 
   const toggleTable = (visible) => {
@@ -1236,11 +1247,13 @@ function initialiseAdminDashboard() {
     if (!services || !services.db) {
       setStatus('Configura Firebase per attivare la dashboard amministratore.', 'error');
       toggleTable(false);
+      showHelp(false);
       return;
     }
 
     if (!currentAdminUser || normaliseEmail(currentAdminUser.email) !== ADMIN_EMAIL) {
       toggleTable(false);
+      showHelp(false);
       return;
     }
 
@@ -1288,10 +1301,27 @@ function initialiseAdminDashboard() {
 
       toggleTable(true);
       setStatus(`Account totali: ${snapshot.size}`, 'success');
+      showHelp(false);
     } catch (error) {
       console.error('Impossibile caricare gli account', error);
       toggleTable(false);
-      setStatus('Impossibile caricare gli account. Riprova più tardi.', 'error');
+      const code = error && error.code ? String(error.code).toLowerCase() : '';
+      const message = error && error.message ? String(error.message) : '';
+
+      if (code === 'permission-denied' || /missing or insufficient permissions/i.test(message)) {
+        setStatus('Accesso negato. Aggiorna le regole di Firestore e riprova.', 'error');
+        showHelp(true);
+      } else if (code === 'failed-precondition' || /index/i.test(message)) {
+        setStatus('Aggiungi un indice Firestore per ordinare gli utenti per data di creazione.', 'error');
+        showHelp(false);
+      } else if (code === 'unavailable') {
+        setStatus('Firestore non è raggiungibile. Controlla la connessione e riprova.', 'error');
+        showHelp(false);
+      } else {
+        const friendly = message || 'Impossibile caricare gli account. Riprova più tardi.';
+        setStatus(friendly, 'error');
+        showHelp(false);
+      }
     }
   };
 
@@ -1308,12 +1338,14 @@ function initialiseAdminDashboard() {
     if (!user) {
       toggleTable(false);
       setStatus('Accedi con l\'account amministratore per consultare gli utenti.', 'info');
+      showHelp(false);
       return;
     }
 
     if (normaliseEmail(user.email) !== ADMIN_EMAIL) {
       toggleTable(false);
       setStatus('Questo pannello è riservato a Romulus (romulus@eurocarsummer.com).', 'error');
+      showHelp(false);
       return;
     }
 
