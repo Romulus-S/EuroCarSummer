@@ -1471,11 +1471,22 @@ function initialiseDetailGallery() {
   const counter = document.createElement('div');
   counter.className = 'gallery-counter';
 
+  const fullscreenButton = document.createElement('button');
+  fullscreenButton.type = 'button';
+  fullscreenButton.className = 'gallery-fullscreen';
+  fullscreenButton.setAttribute('aria-pressed', 'false');
+  fullscreenButton.textContent = 'Schermo intero';
+
+  const meta = document.createElement('div');
+  meta.className = 'gallery-meta';
+  meta.appendChild(counter);
+  meta.appendChild(fullscreenButton);
+
   const thumbs = document.createElement('div');
   thumbs.className = 'gallery-thumbs';
 
   viewer.appendChild(main);
-  viewer.appendChild(counter);
+  viewer.appendChild(meta);
   viewer.appendChild(thumbs);
 
   const updateNavState = (index) => {
@@ -1545,6 +1556,82 @@ function initialiseDetailGallery() {
     render(currentIndex + 1);
   });
 
+  const getFullscreenElement = () => document.fullscreenElement
+    || document.webkitFullscreenElement
+    || document.mozFullScreenElement
+    || document.msFullscreenElement
+    || null;
+
+  const supportsNativeFullscreen = Boolean(
+    viewer.requestFullscreen
+      || viewer.webkitRequestFullscreen
+      || viewer.mozRequestFullScreen
+      || viewer.msRequestFullscreen,
+  );
+
+  const updateFullscreenButton = (isActive) => {
+    fullscreenButton.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    fullscreenButton.textContent = isActive ? 'Chiudi schermo intero' : 'Schermo intero';
+  };
+
+  const enterNativeFullscreen = () => {
+    if (viewer.requestFullscreen) return viewer.requestFullscreen();
+    if (viewer.webkitRequestFullscreen) return viewer.webkitRequestFullscreen();
+    if (viewer.mozRequestFullScreen) return viewer.mozRequestFullScreen();
+    if (viewer.msRequestFullscreen) return viewer.msRequestFullscreen();
+    return Promise.reject(new Error('Fullscreen API non supportata'));
+  };
+
+  const exitNativeFullscreen = () => {
+    if (document.exitFullscreen) return document.exitFullscreen();
+    if (document.webkitExitFullscreen) return document.webkitExitFullscreen();
+    if (document.mozCancelFullScreen) return document.mozCancelFullScreen();
+    if (document.msExitFullscreen) return document.msExitFullscreen();
+    return Promise.reject(new Error('Fullscreen API non supportata'));
+  };
+
+  const toggleFullscreenClass = (active) => {
+    viewer.classList.toggle('is-fullscreen', active);
+    updateFullscreenButton(active);
+    if (document.body) {
+      if (active) {
+        document.body.classList.add('gallery-scroll-lock');
+      } else {
+        document.body.classList.remove('gallery-scroll-lock');
+      }
+    }
+  };
+
+  const handleFullscreenChange = () => {
+    const isActive = getFullscreenElement() === viewer;
+    toggleFullscreenClass(isActive);
+  };
+
+  if (supportsNativeFullscreen) {
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+  }
+
+  fullscreenButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    if (supportsNativeFullscreen) {
+      if (getFullscreenElement() === viewer) {
+        exitNativeFullscreen().catch(() => {
+          toggleFullscreenClass(false);
+        });
+      } else {
+        enterNativeFullscreen().catch(() => {
+          toggleFullscreenClass(!viewer.classList.contains('is-fullscreen'));
+        });
+      }
+    } else {
+      const nextState = !viewer.classList.contains('is-fullscreen');
+      toggleFullscreenClass(nextState);
+    }
+  });
+
   viewer.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
@@ -1552,6 +1639,9 @@ function initialiseDetailGallery() {
     } else if (event.key === 'ArrowRight') {
       event.preventDefault();
       render(currentIndex + 1);
+    } else if (event.key === 'Escape' && viewer.classList.contains('is-fullscreen') && !supportsNativeFullscreen) {
+      event.preventDefault();
+      toggleFullscreenClass(false);
     }
   });
 
@@ -1576,6 +1666,7 @@ function initialiseDetailGallery() {
   detail.dataset.galleryInitialised = 'true';
 
   render(0);
+  toggleFullscreenClass(false);
 }
 
 function isDateDetailPage() {
