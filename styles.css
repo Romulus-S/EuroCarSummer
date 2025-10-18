@@ -1127,6 +1127,45 @@ body.auth-modal-open {
     color: var(--brand-navy);
 }
 
+.admin-help {
+    margin: 0;
+    background: rgba(var(--brand-navy-rgb), 0.06);
+    border: 1px solid rgba(var(--brand-navy-rgb), 0.15);
+    border-radius: 14px;
+    padding: 1rem 1.25rem;
+    color: var(--text-primary);
+}
+
+.admin-help[hidden] {
+    display: none;
+}
+
+.admin-help summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--brand-navy);
+    margin-bottom: 0.75rem;
+}
+
+.admin-help p {
+    margin: 0 0 0.75rem;
+}
+
+.admin-help pre {
+    margin: 0 0 0.75rem;
+    padding: 0.75rem 1rem;
+    background: #0f243f;
+    color: #f7fafc;
+    border-radius: 10px;
+    overflow-x: auto;
+}
+
+.admin-help code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
 .admin-content {
     overflow-x: auto;
     border-radius: 16px;
