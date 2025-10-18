@@ -530,7 +530,40 @@ body {
         align-items: flex-start;
         gap: 1rem;
     }
-@@ -557,619 +567,621 @@ body {
+
+    .site-header nav {
+        width: 100%;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        row-gap: 0.75rem;
+    }
+
+    .header-actions {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .auth-trigger,
+    .logout-button {
+        padding: 0.5rem 1.1rem;
+    }
+
+    .comment-item {
+        padding: 1rem 1.1rem;
+    }
+
+    .comment-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.35rem;
+    }
+
+    .comment-form button {
+        width: 100%;
+        text-align: center;
+    }
 
     .comment-auth-actions {
         width: 100%;
@@ -598,6 +631,22 @@ body {
     font-size: 0.95rem;
 }
 
+@supports not (display: grid) {
+    .post-gallery {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1.75rem;
+    }
+
+    .post-gallery .post-card {
+        flex: 1 1 240px;
+    }
+
+    .post-gallery .post-card > a {
+        height: 100%;
+    }
+}
+
 @media (max-width: 560px) {
     .post-title {
         font-size: 1rem;
@@ -655,6 +704,18 @@ body {
     display: grid;
     gap: 2rem;
     grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+}
+
+@supports not (display: grid) {
+    .auction-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2rem;
+    }
+
+    .auction-grid .auction-card {
+        flex: 1 1 290px;
+    }
 }
 
 .auction-card {
