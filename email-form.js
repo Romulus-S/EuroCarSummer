@@ -1250,6 +1250,58 @@ function initialiseAdminDashboard() {
   });
 }
 
+function enforceLayoutFallbacks() {
+  const galleries = document.querySelectorAll('.post-gallery');
+  galleries.forEach((gallery) => {
+    if (!gallery) return;
+    const computed = window.getComputedStyle(gallery);
+    const display = computed ? computed.display : '';
+    if (display && (display.includes('grid') || display.includes('flex'))) {
+      return;
+    }
+
+    gallery.style.display = 'grid';
+    gallery.style.gridTemplateColumns = 'repeat(auto-fit, minmax(240px, 1fr))';
+    gallery.style.gap = '1.75rem';
+    gallery.style.listStyle = 'none';
+    gallery.style.padding = '0';
+    gallery.style.margin = '0';
+
+    gallery.querySelectorAll('.post-card').forEach((card) => {
+      card.style.margin = '0';
+      const link = card.querySelector('a');
+      if (!link) return;
+      const linkStyle = window.getComputedStyle(link);
+      const linkDisplay = linkStyle ? linkStyle.display : '';
+      if (linkDisplay && linkDisplay.includes('flex')) {
+        return;
+      }
+      link.style.display = 'flex';
+      link.style.flexDirection = 'column';
+      link.style.height = '100%';
+    });
+  });
+
+  const auctionGrids = document.querySelectorAll('.auction-grid');
+  auctionGrids.forEach((grid) => {
+    if (!grid) return;
+    const computed = window.getComputedStyle(grid);
+    const display = computed ? computed.display : '';
+    if (display && (display.includes('grid') || display.includes('flex'))) {
+      return;
+    }
+
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(290px, 1fr))';
+    grid.style.gap = '2rem';
+
+    grid.querySelectorAll('.auction-card').forEach((card) => {
+      card.style.display = 'flex';
+      card.style.flexDirection = 'column';
+    });
+  });
+}
+
 function isDateDetailPage() {
   const pathname = window.location.pathname || '';
   const file = pathname.split('/').pop() || '';
@@ -1746,6 +1798,7 @@ function bootstrapSiteChrome() {
   initialiseAuthSystem();
   initialiseCommentSystem();
   initialiseAdminDashboard();
+  enforceLayoutFallbacks();
 }
 
 if (document.readyState === 'loading') {
