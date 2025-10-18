@@ -904,20 +904,32 @@ function updateAuthUI() {
 
   if (!canAuthenticate) {
     if (trigger) {
-      trigger.disabled = true;
-      trigger.textContent = 'Accesso non disponibile';
+      trigger.disabled = false;
       trigger.hidden = false;
+      trigger.textContent = 'Accedi / Registrati';
+      trigger.setAttribute(
+        'title',
+        'Configura Firebase per abilitare la registrazione e il login.',
+      );
     }
     if (userInfo) {
       userInfo.hidden = true;
     }
+    if (nameTarget) {
+      nameTarget.textContent = '';
+    }
     if (logoutButton) {
       logoutButton.disabled = true;
+      logoutButton.hidden = true;
     }
     if (adminLink) {
       adminLink.hidden = true;
     }
     return;
+  }
+
+  if (trigger) {
+    trigger.removeAttribute('title');
   }
 
   const localUser = canUseLocal ? getCurrentUser() : null;
@@ -937,6 +949,7 @@ function updateAuthUI() {
     }
     if (logoutButton) {
       logoutButton.disabled = false;
+      logoutButton.hidden = false;
     }
   } else {
     if (trigger) {
@@ -952,6 +965,7 @@ function updateAuthUI() {
     }
     if (logoutButton) {
       logoutButton.disabled = false;
+      logoutButton.hidden = true;
     }
   }
 
