@@ -123,17 +123,70 @@ function loadExternalScript(src) {
   return promise;
 }
 
+function cleanFirebaseConfigValue(value) {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (/INSERISCI|il-tuo-progetto/i.test(trimmed)) return '';
+    return trimmed;
+  }
+  if (typeof value === 'number') {
+    return String(value).trim();
+  }
+  return '';
+}
+
 function hasFirebaseConfig(config) {
   if (!config || typeof config !== 'object') return false;
-  const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'appId'];
-  return requiredKeys.every((key) => {
-    const value = config[key];
-    if (typeof value !== 'string') return false;
-    const trimmed = value.trim();
-    if (!trimmed) return false;
-    if (/INSERISCI|il-tuo-progetto/i.test(trimmed)) return false;
-    return true;
-  });
+  const apiKey = cleanFirebaseConfigValue(config.apiKey);
+  const projectId = cleanFirebaseConfigValue(config.projectId);
+  return Boolean(apiKey && projectId);
+}
+
+function normaliseFirebaseConfig(rawConfig) {
+  if (!hasFirebaseConfig(rawConfig)) {
+    return null;
+  }
+
+  const config = { ...rawConfig };
+  config.apiKey = cleanFirebaseConfigValue(rawConfig.apiKey);
+  config.projectId = cleanFirebaseConfigValue(rawConfig.projectId);
+
+  const derivedAuthDomain = `${config.projectId}.firebaseapp.com`;
+  const authDomain = cleanFirebaseConfigValue(rawConfig.authDomain);
+  config.authDomain = authDomain || derivedAuthDomain;
+
+  const derivedBucket = `${config.projectId}.appspot.com`;
+  const storageBucket = cleanFirebaseConfigValue(rawConfig.storageBucket);
+  if (storageBucket) {
+    config.storageBucket = storageBucket;
+  } else {
+    config.storageBucket = derivedBucket;
+  }
+
+  const senderId = cleanFirebaseConfigValue(rawConfig.messagingSenderId)
+    || cleanFirebaseConfigValue(rawConfig.projectNumber);
+  if (senderId) {
+    config.messagingSenderId = senderId;
+  } else {
+    delete config.messagingSenderId;
+  }
+
+  const appId = cleanFirebaseConfigValue(rawConfig.appId);
+  if (appId) {
+    config.appId = appId;
+  } else {
+    delete config.appId;
+  }
+
+  const measurementId = cleanFirebaseConfigValue(rawConfig.measurementId);
+  if (measurementId) {
+    config.measurementId = measurementId;
+  } else {
+    delete config.measurementId;
+  }
+
+  return config;
 }
 
 async function loadFirebaseConfig() {
@@ -141,9 +194,12 @@ async function loadFirebaseConfig() {
     return firebaseConfigPromise;
   }
 
-  if (window && window.ECS_FIREBASE_CONFIG && hasFirebaseConfig(window.ECS_FIREBASE_CONFIG)) {
-    firebaseConfigPromise = Promise.resolve(window.ECS_FIREBASE_CONFIG);
-    return firebaseConfigPromise;
+  if (window && window.ECS_FIREBASE_CONFIG) {
+    const inlineConfig = normaliseFirebaseConfig(window.ECS_FIREBASE_CONFIG);
+    if (inlineConfig) {
+      firebaseConfigPromise = Promise.resolve(inlineConfig);
+      return firebaseConfigPromise;
+    }
   }
 
   firebaseConfigPromise = fetch('firebase-config.json', { cache: 'no-store' })
@@ -152,8 +208,9 @@ async function loadFirebaseConfig() {
       return response.json().catch(() => null);
     })
     .then((config) => {
-      if (hasFirebaseConfig(config)) {
-        return config;
+      const normalised = normaliseFirebaseConfig(config);
+      if (normalised) {
+        return normalised;
       }
       return null;
     })
@@ -836,7 +893,7 @@ async function handleRegisterSubmit(event) {
       message = 'La password scelta è troppo debole. Usa una combinazione più sicura.';
       if (passwordInput) passwordInput.focus();
     } else if (code === 'auth/invalid-email') {
-      message = "L'indirizzo email non è valido.";
+      message = 'L\'indirizzo email non è valido.';
       if (emailInput) emailInput.focus();
     } else if (code === 'auth/network-request-failed') {
       message = 'Connessione assente o instabile. Controlla la rete e riprova.';
@@ -1515,11 +1572,9 @@ function updateCommentAvailability() {
     }
     if (commentState.nameInput) {
       commentState.nameInput.disabled = false;
-      commentState.nameInput.value = commentState.nameInput.value;
     }
     if (commentState.emailInput) {
       commentState.emailInput.disabled = false;
-      commentState.emailInput.value = commentState.emailInput.value;
     }
     return;
   }
