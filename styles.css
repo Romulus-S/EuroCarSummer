@@ -846,6 +846,34 @@ body.gallery-scroll-lock {
     height: 100%;
 }
 
+.post-card.is-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.5rem;
+    border: 1px dashed rgba(var(--brand-navy-rgb), 0.24);
+    border-radius: 14px;
+    background: rgba(var(--brand-navy-rgb), 0.05);
+    box-shadow: none;
+    text-align: center;
+}
+
+.post-card.is-status .post-date {
+    margin: 0;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.post-card.is-status.is-error {
+    border-color: rgba(212, 90, 58, 0.4);
+    background: rgba(212, 90, 58, 0.08);
+}
+
+.post-card.is-status.is-error .post-date {
+    color: #d45a3a;
+}
+
+
 .post-card > a:hover,
 .post-card > a:focus-visible {
     transform: translateY(-4px);
