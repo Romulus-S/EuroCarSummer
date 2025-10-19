@@ -53,20 +53,11 @@ let firebaseActiveUser = null;
 let firebaseObserverAttached = false;
 const authSubscribers = [];
 
-const SITE_CONFIG_PATH = 'site-config.json';
+const POST_MANIFEST_PATH = 'posts-manifest.json';
 const POST_CACHE_STORAGE_KEY = 'ecsPostManifest';
-const POST_CACHE_VERSION = 'v1';
+const POST_CACHE_VERSION = 'v2';
+const POST_CACHE_DEFAULT_TTL_MINUTES = 10;
 const POST_FILENAME_PATTERN = DATE_FILENAME_PATTERN;
-const SITEMAP_PATH = 'sitemap.xml';
-
-const DEFAULT_SITE_CONFIG = {
-  githubOwner: 'EuroCarSummer',
-  githubRepo: 'EuroCarSummer',
-  githubBranch: 'main',
-  postsCacheTtlMinutes: 30,
-};
-
-let siteConfigPromise = null;
 
 function getLocalCommentKey(postId) {
   if (!postId) return `${LOCAL_COMMENT_KEY_PREFIX}unknown`;
@@ -159,34 +150,6 @@ function hasFirebaseConfig(config) {
   return Boolean(apiKey && projectId);
 }
 
-function normaliseSiteConfig(rawConfig) {
-  const config = { ...DEFAULT_SITE_CONFIG };
-  if (!rawConfig || typeof rawConfig !== 'object') {
-    return config;
-  }
-
-  if (typeof rawConfig.githubOwner === 'string' && rawConfig.githubOwner.trim()) {
-    config.githubOwner = rawConfig.githubOwner.trim();
-  }
-  if (typeof rawConfig.githubRepo === 'string' && rawConfig.githubRepo.trim()) {
-    config.githubRepo = rawConfig.githubRepo.trim();
-  }
-  if (typeof rawConfig.githubBranch === 'string' && rawConfig.githubBranch.trim()) {
-    config.githubBranch = rawConfig.githubBranch.trim();
-  }
-
-  const ttl = Number(rawConfig.postsCacheTtlMinutes);
-  if (Number.isFinite(ttl) && ttl > 0) {
-    config.postsCacheTtlMinutes = ttl;
-  }
-
-  if (typeof rawConfig.githubToken === 'string' && rawConfig.githubToken.trim()) {
-    config.githubToken = rawConfig.githubToken.trim();
-  }
-
-  return config;
-}
-
 function normaliseFirebaseConfig(rawConfig) {
   if (!hasFirebaseConfig(rawConfig)) {
     return null;
@@ -263,32 +226,6 @@ async function loadFirebaseConfig() {
   return firebaseConfigPromise;
 }
 
-async function loadSiteConfig() {
-  if (siteConfigPromise) {
-    return siteConfigPromise;
-  }
-
-  if (window && window.ECS_SITE_CONFIG) {
-    siteConfigPromise = Promise.resolve(normaliseSiteConfig(window.ECS_SITE_CONFIG));
-    return siteConfigPromise;
-  }
-
-  siteConfigPromise = fetch(SITE_CONFIG_PATH, { cache: 'no-store' })
-    .then((response) => {
-      if (!response.ok) return null;
-      return response.json().catch(() => null);
-    })
-    .then((config) => {
-      if (config && typeof config === 'object') {
-        return normaliseSiteConfig(config);
-      }
-      return { ...DEFAULT_SITE_CONFIG };
-    })
-    .catch(() => ({ ...DEFAULT_SITE_CONFIG }));
-
-  return siteConfigPromise;
-}
-
 function getPostCacheKey() {
   return `${POST_CACHE_STORAGE_KEY}:${POST_CACHE_VERSION}`;
 }
@@ -326,321 +263,29 @@ function writePostCache(posts, ttlMinutes) {
   }
 }
 
-function normaliseAssetPath(src) {
-  if (!src || typeof src !== 'string') return '';
-  const trimmed = src.trim();
-  if (!trimmed) return '';
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (trimmed.startsWith('//')) return `https:${trimmed}`;
-  if (trimmed.startsWith('./')) return trimmed.slice(2);
-  if (trimmed.startsWith('/')) return trimmed.replace(/^\/+/, '');
-  return trimmed;
-}
-
-function stripDomainFromUrl(value) {
-  if (!value) return '';
-  try {
-    const url = new URL(value, window.location.origin);
-    return url.pathname.replace(/^\/+/, '');
-  } catch (error) {
-    return String(value).replace(/^https?:\/\/[^/]+/i, '').replace(/^\/+/, '');
-  }
-}
-
-function getFilenameFromPath(path) {
-  if (!path) return '';
-  const clean = stripDomainFromUrl(path).split('?')[0].split('#')[0];
-  const parts = clean.split('/');
-  return parts.pop() || clean;
-}
-
-function extractPostMetadataFromDocument(doc, path, fallbackTitle) {
-  if (!doc) return null;
-  const main = doc.querySelector('.post-detail') || doc.body || doc;
-  const titleEl = main.querySelector('h1') || doc.querySelector('title');
-  const timeEl = main.querySelector('time');
-  const emphasisEl = !timeEl ? main.querySelector('em') : null;
-  const imageEl = main.querySelector('img');
-
-  const filename = getFilenameFromPath(path);
-  const title = titleEl ? titleEl.textContent.trim() : (fallbackTitle || filename.replace(/\.html?$/i, ''));
-  const rawDate = timeEl ? timeEl.textContent.trim() : emphasisEl ? emphasisEl.textContent.trim() : '';
-  const fallbackDate = formatDateFromFilename(filename);
-  const displayDate = rawDate || fallbackDate;
-
-  const parsedDate = parseDateFromFilename(filename);
-  const isoDate = parsedDate ? parsedDate.toISOString() : null;
-
-  let imageSrc = imageEl ? imageEl.getAttribute('src') : '';
-  if (!imageSrc && imageEl && imageEl.src) {
-    imageSrc = imageEl.src;
-  }
-  imageSrc = normaliseAssetPath(imageSrc);
-  const imageAlt = imageEl ? (imageEl.getAttribute('alt') || title) : title;
-
-  const href = stripDomainFromUrl(path);
-
-  return {
-    slug: filename.replace(/\.html?$/i, ''),
-    href,
-    title,
-    dateText: displayDate,
-    imageSrc,
-    imageAlt,
-    isoDate,
-  };
-}
-
-function escapeHtml(value) {
-  if (value === undefined || value === null) {
-    return '';
-  }
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function parseDateFromFilename(filename) {
-  const match = DATE_FILENAME_PATTERN.exec(filename || '');
-  if (!match) return null;
-  const [, monthRaw, dayRaw, yearRaw] = match;
-  const month = Number(monthRaw);
-  const day = Number(dayRaw);
-  const year = Number(yearRaw);
-  if (Number.isNaN(month) || Number.isNaN(day) || Number.isNaN(year)) {
-    return null;
-  }
-  const fullYear = year + 2000;
-  const date = new Date(Date.UTC(fullYear, month - 1, day, 12, 0, 0));
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-  return date;
-}
-
-function formatDateFromFilename(filename) {
-  const date = parseDateFromFilename(filename);
-  if (!date) return '';
-  return date.toLocaleDateString('it-IT', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-}
-
-async function fetchPostsFromSitemap() {
-  const response = await fetch(SITEMAP_PATH, { cache: 'no-store' });
-  if (!response || !response.ok) {
-    throw new Error(`Sitemap non disponibile (${response ? response.status : 'nessuna risposta'})`);
-  }
-
-  const xml = await response.text();
-  if (!xml) {
-    throw new Error('Sitemap vuota.');
-  }
-
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xml, 'application/xml');
-  if (!doc || doc.getElementsByTagName('parsererror').length) {
-    throw new Error('Formato sitemap non valido.');
-  }
-
-  const locNodes = Array.from(doc.getElementsByTagName('loc'));
-  const paths = Array.from(new Set(locNodes.map((node) => stripDomainFromUrl(node.textContent || ''))))
-    .filter((path) => POST_FILENAME_PATTERN.test(getFilenameFromPath(path)));
-
-  if (!paths.length) {
-    return [];
-  }
-
-  paths.sort((a, b) => {
-    const fileA = getFilenameFromPath(a);
-    const fileB = getFilenameFromPath(b);
-    const dateA = parseDateFromFilename(fileA);
-    const dateB = parseDateFromFilename(fileB);
-    const timeA = dateA ? dateA.getTime() : 0;
-    const timeB = dateB ? dateB.getTime() : 0;
-    if (timeA !== timeB) {
-      return timeB - timeA;
-    }
-    return fileB.localeCompare(fileA);
-  });
-
-  const htmlParser = new DOMParser();
-  const posts = [];
-
-  for (let index = 0; index < paths.length; index += 1) {
-    const path = paths[index];
-    const requestPath = `/${stripDomainFromUrl(path)}`;
-    try {
-      const pageResponse = await fetch(requestPath, { cache: 'no-store' });
-      if (!pageResponse || !pageResponse.ok) {
-        throw new Error(`Pagina ${requestPath} non raggiungibile (${pageResponse ? pageResponse.status : 'nessuna risposta'})`);
-      }
-      const html = await pageResponse.text();
-      const docHtml = htmlParser.parseFromString(html, 'text/html');
-      const metadata = extractPostMetadataFromDocument(docHtml, path);
-      if (metadata) {
-        posts.push({ ...metadata, order: index });
-      }
-    } catch (error) {
-      console.error('Impossibile estrarre i dati dalla sitemap per', path, error);
-    }
-  }
-
-  posts.sort((a, b) => {
-    const timeA = a.isoDate ? new Date(a.isoDate).getTime() : 0;
-    const timeB = b.isoDate ? new Date(b.isoDate).getTime() : 0;
-    if (timeA !== timeB) {
-      return timeB - timeA;
-    }
-    if (a.order !== undefined && b.order !== undefined) {
-      return a.order - b.order;
-    }
-    return (b.title || '').localeCompare(a.title || '');
-  });
-
-  posts.forEach((post) => {
-    if (Object.prototype.hasOwnProperty.call(post, 'order')) {
-      delete post.order;
-    }
-  });
-
-  return posts;
-}
-
-async function fetchPostsFromGitHub(config) {
-  if (!config) {
-    throw new Error('Configurazione GitHub non disponibile.');
-  }
-
-  const owner = config.githubOwner.trim();
-  const repo = config.githubRepo.trim();
-  const branch = (config.githubBranch && config.githubBranch.trim()) || 'main';
-
-  const headers = {
-    Accept: 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-  };
-  if (config.githubToken) {
-    headers.Authorization = `Bearer ${config.githubToken}`;
-  }
-
-  const treeUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
-  const treeResponse = await fetch(treeUrl, { headers });
-
-  if (!treeResponse.ok) {
-    throw new Error(`GitHub API ha risposto con lo stato ${treeResponse.status}`);
-  }
-
-  const treePayload = await treeResponse.json();
-  if (!treePayload || !Array.isArray(treePayload.tree)) {
-    throw new Error('Formato risposta inatteso dal tree GitHub');
-  }
-
-  const postEntries = treePayload.tree
-    .filter((entry) => entry && entry.type === 'blob' && POST_FILENAME_PATTERN.test(getFilenameFromPath(entry.path)))
-    .map((entry) => entry.path)
-    .sort((a, b) => {
-      const nameA = getFilenameFromPath(a);
-      const nameB = getFilenameFromPath(b);
-      const dateA = parseDateFromFilename(nameA);
-      const dateB = parseDateFromFilename(nameB);
-      const timeA = dateA ? dateA.getTime() : 0;
-      const timeB = dateB ? dateB.getTime() : 0;
-      if (timeA !== timeB) {
-        return timeB - timeA;
-      }
-      return nameB.localeCompare(nameA);
-    });
-
-  if (!postEntries.length) {
-    return [];
-  }
-
-  const parser = new DOMParser();
-  const posts = [];
-
-  for (let index = 0; index < postEntries.length; index += 1) {
-    const path = postEntries[index];
-    const filename = getFilenameFromPath(path);
-    const rawUrl = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(branch)}/${path}`;
-    try {
-      const pageResponse = await fetch(rawUrl, {
-        cache: 'no-store',
-        headers: {
-          Accept: 'text/html',
-        },
-      });
-      if (!pageResponse.ok) {
-        throw new Error(`Pagina ${path} non raggiungibile (${pageResponse.status})`);
-      }
-
-      const html = await pageResponse.text();
-      const doc = parser.parseFromString(html, 'text/html');
-      const metadata = extractPostMetadataFromDocument(doc, filename);
-      if (metadata) {
-        posts.push({ ...metadata, order: index });
-      }
-    } catch (error) {
-      console.error('Impossibile estrarre i dati da', path, error);
-    }
-  }
-
-  posts.sort((a, b) => {
-    const timeA = a.isoDate ? new Date(a.isoDate).getTime() : 0;
-    const timeB = b.isoDate ? new Date(b.isoDate).getTime() : 0;
-    if (timeA !== timeB) {
-      return timeB - timeA;
-    }
-    if (a.order !== undefined && b.order !== undefined) {
-      return a.order - b.order;
-    }
-    return (b.title || '').localeCompare(a.title || '');
-  });
-
-  posts.forEach((post) => {
-    if (Object.prototype.hasOwnProperty.call(post, 'order')) {
-      delete post.order;
-    }
-  });
-
-  return posts;
-}
-
 async function fetchPostManifest() {
   const cached = readPostCache();
   if (cached && cached.length) {
     return cached;
   }
 
-  const config = await loadSiteConfig();
-  const ttlValue = config ? Number(config.postsCacheTtlMinutes) : NaN;
-  const ttl = Number.isFinite(ttlValue) ? ttlValue : 30;
-
   try {
-    const sitemapPosts = await fetchPostsFromSitemap();
-    if (sitemapPosts && sitemapPosts.length) {
-      writePostCache(sitemapPosts, ttl);
-      return sitemapPosts;
+    const response = await fetch(POST_MANIFEST_PATH, { cache: 'no-store' });
+    if (!response || !response.ok) {
+      throw new Error(`Manifesto locale non disponibile (${response ? response.status : 'nessuna risposta'})`);
+    }
+
+    const payload = await response.json().catch(() => null);
+    const posts = Array.isArray(payload)
+      ? payload
+      : (payload && Array.isArray(payload.posts) ? payload.posts : []);
+
+    if (posts.length) {
+      writePostCache(posts, POST_CACHE_DEFAULT_TTL_MINUTES);
+      return posts;
     }
   } catch (error) {
-    console.error('Impossibile utilizzare la sitemap per il manifesto', error);
-  }
-
-  if (config) {
-    try {
-      const githubPosts = await fetchPostsFromGitHub(config);
-      if (githubPosts && githubPosts.length) {
-        writePostCache(githubPosts, ttl);
-        return githubPosts;
-      }
-    } catch (error) {
-      console.error('Errore durante il caricamento del manifesto dei post', error);
-    }
+    console.error('Impossibile leggere posts-manifest.json', error);
   }
 
   if (cached && cached.length) {
@@ -657,17 +302,17 @@ function clearPostPlaceholders(container) {
   });
 }
 
-function createPostCard(post, headingLevel) {
-  const li = document.createElement('li');
-  li.className = 'post-card';
+function createPostCard(post, headingLevel = 'h3') {
+  const item = document.createElement('li');
+  item.className = 'post-card';
 
   const link = document.createElement('a');
   link.href = post.href || '#';
 
   const titleTag = headingLevel || 'h3';
-  const title = document.createElement(titleTag);
-  title.className = 'post-title';
-  title.textContent = post.title || 'Titolo non disponibile';
+  const heading = document.createElement(titleTag);
+  heading.className = 'post-title';
+  heading.textContent = post.title || 'Titolo non disponibile';
 
   const thumb = document.createElement('div');
   thumb.className = 'post-thumbnail';
@@ -691,12 +336,12 @@ function createPostCard(post, headingLevel) {
   date.className = 'post-date';
   date.textContent = post.dateText || '';
 
-  link.appendChild(title);
+  link.appendChild(heading);
   link.appendChild(thumb);
   link.appendChild(date);
-  li.appendChild(link);
+  item.appendChild(link);
 
-  return li;
+  return item;
 }
 
 function renderArchiveGallery(posts, options = {}) {
@@ -707,22 +352,22 @@ function renderArchiveGallery(posts, options = {}) {
   container.innerHTML = '';
 
   if (!posts || !posts.length) {
-    const { state, message } = options;
-    const empty = document.createElement('li');
-    empty.className = 'post-card is-status';
-    if (state === 'error') {
-      empty.classList.add('is-error');
+    const message = options.state === 'error'
+      ? (options.message || 'Impossibile caricare le Macchine del Giorno. Riprova più tardi.')
+      : (options.message || 'Nessuna Macchina del Giorno disponibile al momento.');
+
+    const status = document.createElement('li');
+    status.className = 'post-card is-status';
+    if (options.state === 'error') {
+      status.classList.add('is-error');
     }
-    const text = state === 'error'
-      ? (message || 'Impossibile caricare le Macchine del Giorno. Riprova più tardi.')
-      : 'Nessuna Macchina del Giorno disponibile al momento.';
-    empty.innerHTML = `<p class="post-date">${escapeHtml(text)}</p>`;
-    container.appendChild(empty);
+    status.innerHTML = `<p class="post-date">${escapeHtml(message)}</p>`;
+    container.appendChild(status);
     return;
   }
 
   posts.forEach((post) => {
-    container.appendChild(createPostCard(post, 'h2'));
+    container.appendChild(createPostCard(post, 'h3'));
   });
 }
 
@@ -733,22 +378,23 @@ function renderHomeSampler(posts, options = {}) {
   clearPostPlaceholders(container);
   container.innerHTML = '';
 
-  if (!posts || !posts.length) {
-    const { state, message } = options;
-    const empty = document.createElement('li');
-    empty.className = 'post-card is-status';
-    if (state === 'error') {
-      empty.classList.add('is-error');
+  const selection = Array.isArray(posts) ? posts.slice(0, 3) : [];
+  if (!selection.length) {
+    const message = options.state === 'error'
+      ? (options.message || 'Non è stato possibile mostrare le ultime auto.')
+      : (options.message || 'Le ultime Macchine del Giorno appariranno qui a breve…');
+
+    const status = document.createElement('li');
+    status.className = 'post-card is-status';
+    if (options.state === 'error') {
+      status.classList.add('is-error');
     }
-    const text = state === 'error'
-      ? (message || 'Non è stato possibile recuperare le ultime auto in evidenza.')
-      : 'Aggiungi una nuova pagina per vedere qui le ultime tre auto.';
-    empty.innerHTML = `<p class="post-date">${escapeHtml(text)}</p>`;
-    container.appendChild(empty);
+    status.innerHTML = `<p class="post-date">${escapeHtml(message)}</p>`;
+    container.appendChild(status);
     return;
   }
 
-  posts.slice(0, 3).forEach((post) => {
+  selection.forEach((post) => {
     container.appendChild(createPostCard(post, 'h3'));
   });
 }
