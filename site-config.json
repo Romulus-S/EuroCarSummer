@@ -2,5 +2,5 @@
   "githubOwner": "EuroCarSummer",
   "githubRepo": "EuroCarSummer",
   "githubBranch": "main",
-  "postsCacheTtlMinutes": 30
+  "postsCacheTtlMinutes": 1
 }
