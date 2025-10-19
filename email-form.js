@@ -7,7 +7,8 @@ function slugifyPath(pathname) {
 }
 
 const ADMIN_EMAIL = 'romulus@eurocarsummer.com';
-const DATE_PAGE_PATTERN = /^\d{1,2}-\d{1,2}-\d{2}\.html$/i;
+const DATE_FILENAME_PATTERN = /^(\d{1,2})[-_](\d{1,2})[-_](\d{2})\.html$/i;
+const DATE_PAGE_PATTERN = DATE_FILENAME_PATTERN;
 
 const commentState = {
   initialised: false,
@@ -52,6 +53,16 @@ let firebaseActiveUser = null;
 let firebaseObserverAttached = false;
 const authSubscribers = [];
 
+<<<<<<< ours
+=======
+const SITE_CONFIG_PATH = 'site-config.json';
+const POST_CACHE_STORAGE_KEY = 'ecsPostManifest';
+const POST_CACHE_VERSION = 'v1';
+const POST_FILENAME_PATTERN = DATE_FILENAME_PATTERN;
+
+let siteConfigPromise = null;
+
+>>>>>>> theirs
 function getLocalCommentKey(postId) {
   if (!postId) return `${LOCAL_COMMENT_KEY_PREFIX}unknown`;
   return `${LOCAL_COMMENT_KEY_PREFIX}${postId}`;
@@ -219,6 +230,359 @@ async function loadFirebaseConfig() {
   return firebaseConfigPromise;
 }
 
+<<<<<<< ours
+=======
+async function loadSiteConfig() {
+  if (siteConfigPromise) {
+    return siteConfigPromise;
+  }
+
+  if (window && window.ECS_SITE_CONFIG && hasSiteConfig(window.ECS_SITE_CONFIG)) {
+    siteConfigPromise = Promise.resolve(window.ECS_SITE_CONFIG);
+    return siteConfigPromise;
+  }
+
+  siteConfigPromise = fetch(SITE_CONFIG_PATH, { cache: 'no-store' })
+    .then((response) => {
+      if (!response.ok) return null;
+      return response.json().catch(() => null);
+    })
+    .then((config) => {
+      if (hasSiteConfig(config)) {
+        return config;
+      }
+      return null;
+    })
+    .catch(() => null);
+
+  return siteConfigPromise;
+}
+
+function getPostCacheKey() {
+  return `${POST_CACHE_STORAGE_KEY}:${POST_CACHE_VERSION}`;
+}
+
+function readPostCache() {
+  if (!authStorage) return null;
+  try {
+    const raw = authStorage.getItem(getPostCacheKey());
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
+      authStorage.removeItem(getPostCacheKey());
+      return null;
+    }
+    if (!Array.isArray(parsed.posts)) return null;
+    return parsed.posts;
+  } catch (error) {
+    return null;
+  }
+}
+
+function writePostCache(posts, ttlMinutes) {
+  if (!authStorage) return;
+  try {
+    const payload = {
+      posts: Array.isArray(posts) ? posts : [],
+    };
+    if (ttlMinutes && Number.isFinite(ttlMinutes)) {
+      payload.expiresAt = Date.now() + ttlMinutes * 60 * 1000;
+    }
+    authStorage.setItem(getPostCacheKey(), JSON.stringify(payload));
+  } catch (error) {
+    // ignore storage failures
+  }
+}
+
+function normaliseAssetPath(src) {
+  if (!src || typeof src !== 'string') return '';
+  const trimmed = src.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith('//')) return `https:${trimmed}`;
+  if (trimmed.startsWith('./')) return trimmed.slice(2);
+  if (trimmed.startsWith('/')) return trimmed.replace(/^\/+/, '');
+  return trimmed;
+}
+
+function escapeHtml(value) {
+  if (value === undefined || value === null) {
+    return '';
+  }
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function parseDateFromFilename(filename) {
+  const match = DATE_FILENAME_PATTERN.exec(filename || '');
+  if (!match) return null;
+  const [, monthRaw, dayRaw, yearRaw] = match;
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+  const year = Number(yearRaw);
+  if (Number.isNaN(month) || Number.isNaN(day) || Number.isNaN(year)) {
+    return null;
+  }
+  const fullYear = year + 2000;
+  const date = new Date(Date.UTC(fullYear, month - 1, day, 12, 0, 0));
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date;
+}
+
+function formatDateFromFilename(filename) {
+  const date = parseDateFromFilename(filename);
+  if (!date) return '';
+  return date.toLocaleDateString('it-IT', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+async function fetchPostManifest() {
+  const cached = readPostCache();
+  if (cached && cached.length) {
+    return cached;
+  }
+
+  const config = await loadSiteConfig();
+  if (!config) {
+    if (cached && cached.length) {
+      return cached;
+    }
+    throw new Error('Configurazione del repository non disponibile.');
+  }
+
+  const owner = config.githubOwner.trim();
+  const repo = config.githubRepo.trim();
+  const branch = (config.githubBranch && config.githubBranch.trim()) || 'main';
+
+  const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents?ref=${encodeURIComponent(branch)}`;
+
+  try {
+    const response = await fetch(apiUrl, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`GitHub API ha risposto con lo stato ${response.status}`);
+    }
+
+    const entries = await response.json();
+    if (!Array.isArray(entries)) {
+      throw new Error('Formato risposta inatteso per i contenuti del repository');
+    }
+
+    const postFilenames = entries
+      .filter((entry) => entry && entry.type === 'file' && POST_FILENAME_PATTERN.test(entry.name))
+      .map((entry) => entry.name)
+      .sort((a, b) => {
+        const dateA = parseDateFromFilename(a);
+        const dateB = parseDateFromFilename(b);
+        const timeA = dateA ? dateA.getTime() : 0;
+        const timeB = dateB ? dateB.getTime() : 0;
+        return timeB - timeA;
+      });
+
+    const parser = new DOMParser();
+
+    const posts = (await Promise.all(postFilenames.map(async (filename, index) => {
+      try {
+        const rawUrl = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(branch)}/${filename}`;
+        const pageResponse = await fetch(rawUrl, {
+          headers: {
+            Accept: 'text/html',
+          },
+        });
+        if (!pageResponse.ok) {
+          throw new Error(`Pagina ${filename} non raggiungibile (${pageResponse.status})`);
+        }
+
+        const html = await pageResponse.text();
+        const doc = parser.parseFromString(html, 'text/html');
+        const main = doc.querySelector('.post-detail') || doc.body || doc;
+        const titleEl = main.querySelector('h1') || doc.querySelector('title');
+        const timeEl = main.querySelector('time');
+        const emphasisEl = !timeEl ? main.querySelector('em') : null;
+        const imageEl = main.querySelector('img');
+
+        const title = titleEl ? titleEl.textContent.trim() : filename.replace(/\.html?$/i, '');
+        const rawDate = timeEl ? timeEl.textContent.trim() : emphasisEl ? emphasisEl.textContent.trim() : '';
+        const fallbackDate = formatDateFromFilename(filename);
+        const displayDate = rawDate || fallbackDate;
+
+        const parsedDate = parseDateFromFilename(filename);
+        const isoDate = parsedDate ? parsedDate.toISOString() : null;
+
+        let imageSrc = imageEl ? imageEl.getAttribute('src') : '';
+        if (!imageSrc && imageEl && imageEl.src) {
+          imageSrc = imageEl.src;
+        }
+        imageSrc = normaliseAssetPath(imageSrc);
+        const imageAlt = imageEl ? (imageEl.getAttribute('alt') || title) : title;
+
+        return {
+          order: index,
+          slug: filename.replace(/\.html?$/i, ''),
+          href: filename,
+          title,
+          dateText: displayDate,
+          imageSrc,
+          imageAlt,
+          isoDate,
+        };
+      } catch (error) {
+        console.error('Impossibile estrarre i dati da', filename, error);
+        return null;
+      }
+    }))).filter(Boolean);
+
+    posts.sort((a, b) => {
+      const timeA = a.isoDate ? new Date(a.isoDate).getTime() : 0;
+      const timeB = b.isoDate ? new Date(b.isoDate).getTime() : 0;
+      if (timeA !== timeB) {
+        return timeB - timeA;
+      }
+      if (a.order !== undefined && b.order !== undefined) {
+        return a.order - b.order;
+      }
+      return (b.title || '').localeCompare(a.title || '');
+    });
+
+    posts.forEach((post) => {
+      if (Object.prototype.hasOwnProperty.call(post, 'order')) {
+        delete post.order;
+      }
+    });
+
+    const ttlValue = Number(config.postsCacheTtlMinutes);
+    const ttl = Number.isFinite(ttlValue) ? ttlValue : 30;
+    if (posts.length) {
+      writePostCache(posts, ttl);
+    }
+
+    return posts;
+  } catch (error) {
+    console.error('Errore durante il caricamento del manifesto dei post', error);
+    if (cached && cached.length) {
+      return cached;
+    }
+    throw error;
+  }
+}
+
+function clearPostPlaceholders(container) {
+  if (!container) return;
+  container.querySelectorAll('[data-placeholder]').forEach((node) => {
+    node.remove();
+  });
+}
+
+function createPostCard(post, headingLevel) {
+  const li = document.createElement('li');
+  li.className = 'post-card';
+
+  const link = document.createElement('a');
+  link.href = post.href || '#';
+
+  const titleTag = headingLevel || 'h3';
+  const title = document.createElement(titleTag);
+  title.className = 'post-title';
+  title.textContent = post.title || 'Titolo non disponibile';
+
+  const thumb = document.createElement('div');
+  thumb.className = 'post-thumbnail';
+
+  if (post.imageSrc) {
+    const img = document.createElement('img');
+    img.src = post.imageSrc;
+    img.alt = post.imageAlt || post.title || '';
+    img.loading = 'lazy';
+    thumb.appendChild(img);
+  } else {
+    const placeholder = document.createElement('div');
+    placeholder.textContent = 'Immagine non disponibile';
+    placeholder.style.padding = '2rem 1rem';
+    placeholder.style.textAlign = 'center';
+    placeholder.style.color = 'rgba(27, 79, 163, 0.6)';
+    thumb.appendChild(placeholder);
+  }
+
+  const date = document.createElement('p');
+  date.className = 'post-date';
+  date.textContent = post.dateText || '';
+
+  link.appendChild(title);
+  link.appendChild(thumb);
+  link.appendChild(date);
+  li.appendChild(link);
+
+  return li;
+}
+
+function renderArchiveGallery(posts, options = {}) {
+  const container = document.querySelector('[data-archive-gallery]');
+  if (!container) return;
+
+  clearPostPlaceholders(container);
+  container.innerHTML = '';
+
+  if (!posts || !posts.length) {
+    const { state, message } = options;
+    const empty = document.createElement('li');
+    empty.className = 'post-card is-status';
+    if (state === 'error') {
+      empty.classList.add('is-error');
+    }
+    const text = state === 'error'
+      ? (message || 'Impossibile caricare le Macchine del Giorno. Riprova più tardi.')
+      : 'Nessuna Macchina del Giorno disponibile al momento.';
+    empty.innerHTML = `<p class="post-date">${escapeHtml(text)}</p>`;
+    container.appendChild(empty);
+    return;
+  }
+
+  posts.forEach((post) => {
+    container.appendChild(createPostCard(post, 'h2'));
+  });
+}
+
+function renderHomeSampler(posts, options = {}) {
+  const container = document.querySelector('[data-home-macchina]');
+  if (!container) return;
+
+  clearPostPlaceholders(container);
+  container.innerHTML = '';
+
+  if (!posts || !posts.length) {
+    const { state, message } = options;
+    const empty = document.createElement('li');
+    empty.className = 'post-card is-status';
+    if (state === 'error') {
+      empty.classList.add('is-error');
+    }
+    const text = state === 'error'
+      ? (message || 'Non è stato possibile recuperare le ultime auto in evidenza.')
+      : 'Aggiungi una nuova pagina per vedere qui le ultime tre auto.';
+    empty.innerHTML = `<p class="post-date">${escapeHtml(text)}</p>`;
+    container.appendChild(empty);
+    return;
+  }
+
+  posts.slice(0, 3).forEach((post) => {
+    container.appendChild(createPostCard(post, 'h3'));
+  });
+}
+
+>>>>>>> theirs
 async function prepareFirebase() {
   if (firebaseInitPromise) {
     return firebaseInitPromise;
@@ -1405,6 +1769,39 @@ function enforceLayoutFallbacks() {
   });
 }
 
+<<<<<<< ours
+=======
+function initialisePostListings() {
+  const archiveTarget = document.querySelector('[data-archive-gallery]');
+  const homeTarget = document.querySelector('[data-home-macchina]');
+  if (!archiveTarget && !homeTarget) {
+    return;
+  }
+
+  fetchPostManifest()
+    .then((posts) => {
+      const list = Array.isArray(posts) ? posts : [];
+      const state = list.length ? 'ready' : 'empty';
+      if (archiveTarget) {
+        renderArchiveGallery(list, { state });
+      }
+      if (homeTarget) {
+        renderHomeSampler(list, { state });
+      }
+    })
+    .catch((error) => {
+      console.error('Impossibile inizializzare le liste delle macchine', error);
+      const message = (error && error.message) ? error.message : 'Servizio temporaneamente non disponibile.';
+      if (archiveTarget) {
+        renderArchiveGallery([], { state: 'error', message });
+      }
+      if (homeTarget) {
+        renderHomeSampler([], { state: 'error', message });
+      }
+    });
+}
+
+>>>>>>> theirs
 function initialiseDetailGallery() {
   const detail = document.querySelector('.post-detail');
   if (!detail || detail.dataset.galleryInitialised === 'true') {
