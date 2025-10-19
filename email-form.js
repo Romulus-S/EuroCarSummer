@@ -59,6 +59,13 @@ const POST_CACHE_VERSION = 'v1';
 const POST_FILENAME_PATTERN = DATE_FILENAME_PATTERN;
 const SITEMAP_PATH = 'sitemap.xml';
 
+const DEFAULT_SITE_CONFIG = {
+  githubOwner: 'EuroCarSummer',
+  githubRepo: 'EuroCarSummer',
+  githubBranch: 'main',
+  postsCacheTtlMinutes: 30,
+};
+
 let siteConfigPromise = null;
 
 function getLocalCommentKey(postId) {
@@ -152,11 +159,32 @@ function hasFirebaseConfig(config) {
   return Boolean(apiKey && projectId);
 }
 
-function hasSiteConfig(config) {
-  if (!config || typeof config !== 'object') return false;
-  if (!config.githubOwner || !config.githubRepo) return false;
-  if (typeof config.githubOwner !== 'string' || typeof config.githubRepo !== 'string') return false;
-  return true;
+function normaliseSiteConfig(rawConfig) {
+  const config = { ...DEFAULT_SITE_CONFIG };
+  if (!rawConfig || typeof rawConfig !== 'object') {
+    return config;
+  }
+
+  if (typeof rawConfig.githubOwner === 'string' && rawConfig.githubOwner.trim()) {
+    config.githubOwner = rawConfig.githubOwner.trim();
+  }
+  if (typeof rawConfig.githubRepo === 'string' && rawConfig.githubRepo.trim()) {
+    config.githubRepo = rawConfig.githubRepo.trim();
+  }
+  if (typeof rawConfig.githubBranch === 'string' && rawConfig.githubBranch.trim()) {
+    config.githubBranch = rawConfig.githubBranch.trim();
+  }
+
+  const ttl = Number(rawConfig.postsCacheTtlMinutes);
+  if (Number.isFinite(ttl) && ttl > 0) {
+    config.postsCacheTtlMinutes = ttl;
+  }
+
+  if (typeof rawConfig.githubToken === 'string' && rawConfig.githubToken.trim()) {
+    config.githubToken = rawConfig.githubToken.trim();
+  }
+
+  return config;
 }
 
 function normaliseFirebaseConfig(rawConfig) {
@@ -240,8 +268,8 @@ async function loadSiteConfig() {
     return siteConfigPromise;
   }
 
-  if (window && window.ECS_SITE_CONFIG && hasSiteConfig(window.ECS_SITE_CONFIG)) {
-    siteConfigPromise = Promise.resolve(window.ECS_SITE_CONFIG);
+  if (window && window.ECS_SITE_CONFIG) {
+    siteConfigPromise = Promise.resolve(normaliseSiteConfig(window.ECS_SITE_CONFIG));
     return siteConfigPromise;
   }
 
@@ -251,12 +279,12 @@ async function loadSiteConfig() {
       return response.json().catch(() => null);
     })
     .then((config) => {
-      if (hasSiteConfig(config)) {
-        return config;
+      if (config && typeof config === 'object') {
+        return normaliseSiteConfig(config);
       }
-      return null;
+      return { ...DEFAULT_SITE_CONFIG };
     })
-    .catch(() => null);
+    .catch(() => ({ ...DEFAULT_SITE_CONFIG }));
 
   return siteConfigPromise;
 }
@@ -493,63 +521,74 @@ async function fetchPostsFromGitHub(config) {
   const repo = config.githubRepo.trim();
   const branch = (config.githubBranch && config.githubBranch.trim()) || 'main';
 
-  const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents?ref=${encodeURIComponent(branch)}`;
-
-  const response = await fetch(apiUrl, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`GitHub API ha risposto con lo stato ${response.status}`);
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  if (config.githubToken) {
+    headers.Authorization = `Bearer ${config.githubToken}`;
   }
 
-  const entries = await response.json();
-  if (!Array.isArray(entries)) {
-    throw new Error('Formato risposta inatteso per i contenuti del repository');
+  const treeUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
+  const treeResponse = await fetch(treeUrl, { headers });
+
+  if (!treeResponse.ok) {
+    throw new Error(`GitHub API ha risposto con lo stato ${treeResponse.status}`);
   }
 
-  const postFilenames = entries
-    .filter((entry) => entry && entry.type === 'file' && POST_FILENAME_PATTERN.test(entry.name))
-    .map((entry) => entry.name)
+  const treePayload = await treeResponse.json();
+  if (!treePayload || !Array.isArray(treePayload.tree)) {
+    throw new Error('Formato risposta inatteso dal tree GitHub');
+  }
+
+  const postEntries = treePayload.tree
+    .filter((entry) => entry && entry.type === 'blob' && POST_FILENAME_PATTERN.test(getFilenameFromPath(entry.path)))
+    .map((entry) => entry.path)
     .sort((a, b) => {
-      const dateA = parseDateFromFilename(a);
-      const dateB = parseDateFromFilename(b);
+      const nameA = getFilenameFromPath(a);
+      const nameB = getFilenameFromPath(b);
+      const dateA = parseDateFromFilename(nameA);
+      const dateB = parseDateFromFilename(nameB);
       const timeA = dateA ? dateA.getTime() : 0;
       const timeB = dateB ? dateB.getTime() : 0;
-      return timeB - timeA;
+      if (timeA !== timeB) {
+        return timeB - timeA;
+      }
+      return nameB.localeCompare(nameA);
     });
 
-  const parser = new DOMParser();
+  if (!postEntries.length) {
+    return [];
+  }
 
-  const posts = (await Promise.all(postFilenames.map(async (filename, index) => {
+  const parser = new DOMParser();
+  const posts = [];
+
+  for (let index = 0; index < postEntries.length; index += 1) {
+    const path = postEntries[index];
+    const filename = getFilenameFromPath(path);
+    const rawUrl = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(branch)}/${path}`;
     try {
-      const rawUrl = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(branch)}/${filename}`;
       const pageResponse = await fetch(rawUrl, {
+        cache: 'no-store',
         headers: {
           Accept: 'text/html',
         },
       });
       if (!pageResponse.ok) {
-        throw new Error(`Pagina ${filename} non raggiungibile (${pageResponse.status})`);
+        throw new Error(`Pagina ${path} non raggiungibile (${pageResponse.status})`);
       }
 
       const html = await pageResponse.text();
       const doc = parser.parseFromString(html, 'text/html');
       const metadata = extractPostMetadataFromDocument(doc, filename);
-      if (!metadata) {
-        return null;
+      if (metadata) {
+        posts.push({ ...metadata, order: index });
       }
-      return {
-        ...metadata,
-        order: index,
-      };
     } catch (error) {
-      console.error('Impossibile estrarre i dati da', filename, error);
-      return null;
+      console.error('Impossibile estrarre i dati da', path, error);
     }
-  }))).filter(Boolean);
+  }
 
   posts.sort((a, b) => {
     const timeA = a.isoDate ? new Date(a.isoDate).getTime() : 0;
@@ -1901,7 +1940,49 @@ function enforceLayoutFallbacks() {
 }
 
 function initialisePostListings() {
-    // Le liste vengono ora gestite manualmente nei file HTML.
+  const archiveContainer = document.querySelector('[data-archive-gallery]');
+  const homeContainer = document.querySelector('[data-home-macchina]');
+
+  if (!archiveContainer && !homeContainer) {
+    return;
+  }
+
+  const showLoading = () => {
+    if (archiveContainer) {
+      renderArchiveGallery([], { state: 'loading', message: 'Caricamento archivio in corso…' });
+    }
+    if (homeContainer) {
+      renderHomeSampler([], { state: 'loading', message: 'Caricamento ultime auto…' });
+    }
+  };
+
+  const handleError = (error) => {
+    const message = error && error.message
+      ? error.message
+      : 'Impossibile aggiornare le Macchine del Giorno.';
+    if (archiveContainer) {
+      renderArchiveGallery([], { state: 'error', message });
+    }
+    if (homeContainer) {
+      renderHomeSampler([], { state: 'error', message });
+    }
+  };
+
+  showLoading();
+
+  fetchPostManifest()
+    .then((posts) => {
+      if (archiveContainer) {
+        renderArchiveGallery(posts);
+      }
+      if (homeContainer) {
+        renderHomeSampler(posts);
+      }
+    })
+    .catch((error) => {
+      console.error('Impossibile caricare il manifesto delle Macchine del Giorno', error);
+      handleError(error);
+    });
 }
 
 function initialiseDetailGallery() {
