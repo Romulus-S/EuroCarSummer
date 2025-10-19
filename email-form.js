@@ -57,6 +57,7 @@ const SITE_CONFIG_PATH = 'site-config.json';
 const POST_CACHE_STORAGE_KEY = 'ecsPostManifest';
 const POST_CACHE_VERSION = 'v1';
 const POST_FILENAME_PATTERN = DATE_FILENAME_PATTERN;
+const SITEMAP_PATH = 'sitemap.xml';
 
 let siteConfigPromise = null;
 
@@ -308,6 +309,60 @@ function normaliseAssetPath(src) {
   return trimmed;
 }
 
+function stripDomainFromUrl(value) {
+  if (!value) return '';
+  try {
+    const url = new URL(value, window.location.origin);
+    return url.pathname.replace(/^\/+/, '');
+  } catch (error) {
+    return String(value).replace(/^https?:\/\/[^/]+/i, '').replace(/^\/+/, '');
+  }
+}
+
+function getFilenameFromPath(path) {
+  if (!path) return '';
+  const clean = stripDomainFromUrl(path).split('?')[0].split('#')[0];
+  const parts = clean.split('/');
+  return parts.pop() || clean;
+}
+
+function extractPostMetadataFromDocument(doc, path, fallbackTitle) {
+  if (!doc) return null;
+  const main = doc.querySelector('.post-detail') || doc.body || doc;
+  const titleEl = main.querySelector('h1') || doc.querySelector('title');
+  const timeEl = main.querySelector('time');
+  const emphasisEl = !timeEl ? main.querySelector('em') : null;
+  const imageEl = main.querySelector('img');
+
+  const filename = getFilenameFromPath(path);
+  const title = titleEl ? titleEl.textContent.trim() : (fallbackTitle || filename.replace(/\.html?$/i, ''));
+  const rawDate = timeEl ? timeEl.textContent.trim() : emphasisEl ? emphasisEl.textContent.trim() : '';
+  const fallbackDate = formatDateFromFilename(filename);
+  const displayDate = rawDate || fallbackDate;
+
+  const parsedDate = parseDateFromFilename(filename);
+  const isoDate = parsedDate ? parsedDate.toISOString() : null;
+
+  let imageSrc = imageEl ? imageEl.getAttribute('src') : '';
+  if (!imageSrc && imageEl && imageEl.src) {
+    imageSrc = imageEl.src;
+  }
+  imageSrc = normaliseAssetPath(imageSrc);
+  const imageAlt = imageEl ? (imageEl.getAttribute('alt') || title) : title;
+
+  const href = stripDomainFromUrl(path);
+
+  return {
+    slug: filename.replace(/\.html?$/i, ''),
+    href,
+    title,
+    dateText: displayDate,
+    imageSrc,
+    imageAlt,
+    isoDate,
+  };
+}
+
 function escapeHtml(value) {
   if (value === undefined || value === null) {
     return '';
@@ -348,18 +403,90 @@ function formatDateFromFilename(filename) {
   });
 }
 
-async function fetchPostManifest() {
-  const cached = readPostCache();
-  if (cached && cached.length) {
-    return cached;
+async function fetchPostsFromSitemap() {
+  const response = await fetch(SITEMAP_PATH, { cache: 'no-store' });
+  if (!response || !response.ok) {
+    throw new Error(`Sitemap non disponibile (${response ? response.status : 'nessuna risposta'})`);
   }
 
-  const config = await loadSiteConfig();
-  if (!config) {
-    if (cached && cached.length) {
-      return cached;
+  const xml = await response.text();
+  if (!xml) {
+    throw new Error('Sitemap vuota.');
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'application/xml');
+  if (!doc || doc.getElementsByTagName('parsererror').length) {
+    throw new Error('Formato sitemap non valido.');
+  }
+
+  const locNodes = Array.from(doc.getElementsByTagName('loc'));
+  const paths = Array.from(new Set(locNodes.map((node) => stripDomainFromUrl(node.textContent || ''))))
+    .filter((path) => POST_FILENAME_PATTERN.test(getFilenameFromPath(path)));
+
+  if (!paths.length) {
+    return [];
+  }
+
+  paths.sort((a, b) => {
+    const fileA = getFilenameFromPath(a);
+    const fileB = getFilenameFromPath(b);
+    const dateA = parseDateFromFilename(fileA);
+    const dateB = parseDateFromFilename(fileB);
+    const timeA = dateA ? dateA.getTime() : 0;
+    const timeB = dateB ? dateB.getTime() : 0;
+    if (timeA !== timeB) {
+      return timeB - timeA;
     }
-    throw new Error('Configurazione del repository non disponibile.');
+    return fileB.localeCompare(fileA);
+  });
+
+  const htmlParser = new DOMParser();
+  const posts = [];
+
+  for (let index = 0; index < paths.length; index += 1) {
+    const path = paths[index];
+    const requestPath = `/${stripDomainFromUrl(path)}`;
+    try {
+      const pageResponse = await fetch(requestPath, { cache: 'no-store' });
+      if (!pageResponse || !pageResponse.ok) {
+        throw new Error(`Pagina ${requestPath} non raggiungibile (${pageResponse ? pageResponse.status : 'nessuna risposta'})`);
+      }
+      const html = await pageResponse.text();
+      const docHtml = htmlParser.parseFromString(html, 'text/html');
+      const metadata = extractPostMetadataFromDocument(docHtml, path);
+      if (metadata) {
+        posts.push({ ...metadata, order: index });
+      }
+    } catch (error) {
+      console.error('Impossibile estrarre i dati dalla sitemap per', path, error);
+    }
+  }
+
+  posts.sort((a, b) => {
+    const timeA = a.isoDate ? new Date(a.isoDate).getTime() : 0;
+    const timeB = b.isoDate ? new Date(b.isoDate).getTime() : 0;
+    if (timeA !== timeB) {
+      return timeB - timeA;
+    }
+    if (a.order !== undefined && b.order !== undefined) {
+      return a.order - b.order;
+    }
+    return (b.title || '').localeCompare(a.title || '');
+  });
+
+  posts.forEach((post) => {
+    if (Object.prototype.hasOwnProperty.call(post, 'order')) {
+      delete post.order;
+    }
+  });
+
+  return posts;
+}
+
+async function fetchPostsFromGitHub(config) {
+  if (!config) {
+    throw new Error('Configurazione GitHub non disponibile.');
   }
 
   const owner = config.githubOwner.trim();
@@ -368,117 +495,120 @@ async function fetchPostManifest() {
 
   const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents?ref=${encodeURIComponent(branch)}`;
 
-  try {
-    const response = await fetch(apiUrl, {
-      headers: {
-        Accept: 'application/vnd.github+json',
-      },
+  const response = await fetch(apiUrl, {
+    headers: {
+      Accept: 'application/vnd.github+json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`GitHub API ha risposto con lo stato ${response.status}`);
+  }
+
+  const entries = await response.json();
+  if (!Array.isArray(entries)) {
+    throw new Error('Formato risposta inatteso per i contenuti del repository');
+  }
+
+  const postFilenames = entries
+    .filter((entry) => entry && entry.type === 'file' && POST_FILENAME_PATTERN.test(entry.name))
+    .map((entry) => entry.name)
+    .sort((a, b) => {
+      const dateA = parseDateFromFilename(a);
+      const dateB = parseDateFromFilename(b);
+      const timeA = dateA ? dateA.getTime() : 0;
+      const timeB = dateB ? dateB.getTime() : 0;
+      return timeB - timeA;
     });
-    if (!response.ok) {
-      throw new Error(`GitHub API ha risposto con lo stato ${response.status}`);
-    }
 
-    const entries = await response.json();
-    if (!Array.isArray(entries)) {
-      throw new Error('Formato risposta inatteso per i contenuti del repository');
-    }
+  const parser = new DOMParser();
 
-    const postFilenames = entries
-      .filter((entry) => entry && entry.type === 'file' && POST_FILENAME_PATTERN.test(entry.name))
-      .map((entry) => entry.name)
-      .sort((a, b) => {
-        const dateA = parseDateFromFilename(a);
-        const dateB = parseDateFromFilename(b);
-        const timeA = dateA ? dateA.getTime() : 0;
-        const timeB = dateB ? dateB.getTime() : 0;
-        return timeB - timeA;
+  const posts = (await Promise.all(postFilenames.map(async (filename, index) => {
+    try {
+      const rawUrl = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(branch)}/${filename}`;
+      const pageResponse = await fetch(rawUrl, {
+        headers: {
+          Accept: 'text/html',
+        },
       });
+      if (!pageResponse.ok) {
+        throw new Error(`Pagina ${filename} non raggiungibile (${pageResponse.status})`);
+      }
 
-    const parser = new DOMParser();
-
-    const posts = (await Promise.all(postFilenames.map(async (filename, index) => {
-      try {
-        const rawUrl = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(branch)}/${filename}`;
-        const pageResponse = await fetch(rawUrl, {
-          headers: {
-            Accept: 'text/html',
-          },
-        });
-        if (!pageResponse.ok) {
-          throw new Error(`Pagina ${filename} non raggiungibile (${pageResponse.status})`);
-        }
-
-        const html = await pageResponse.text();
-        const doc = parser.parseFromString(html, 'text/html');
-        const main = doc.querySelector('.post-detail') || doc.body || doc;
-        const titleEl = main.querySelector('h1') || doc.querySelector('title');
-        const timeEl = main.querySelector('time');
-        const emphasisEl = !timeEl ? main.querySelector('em') : null;
-        const imageEl = main.querySelector('img');
-
-        const title = titleEl ? titleEl.textContent.trim() : filename.replace(/\.html?$/i, '');
-        const rawDate = timeEl ? timeEl.textContent.trim() : emphasisEl ? emphasisEl.textContent.trim() : '';
-        const fallbackDate = formatDateFromFilename(filename);
-        const displayDate = rawDate || fallbackDate;
-
-        const parsedDate = parseDateFromFilename(filename);
-        const isoDate = parsedDate ? parsedDate.toISOString() : null;
-
-        let imageSrc = imageEl ? imageEl.getAttribute('src') : '';
-        if (!imageSrc && imageEl && imageEl.src) {
-          imageSrc = imageEl.src;
-        }
-        imageSrc = normaliseAssetPath(imageSrc);
-        const imageAlt = imageEl ? (imageEl.getAttribute('alt') || title) : title;
-
-        return {
-          order: index,
-          slug: filename.replace(/\.html?$/i, ''),
-          href: filename,
-          title,
-          dateText: displayDate,
-          imageSrc,
-          imageAlt,
-          isoDate,
-        };
-      } catch (error) {
-        console.error('Impossibile estrarre i dati da', filename, error);
+      const html = await pageResponse.text();
+      const doc = parser.parseFromString(html, 'text/html');
+      const metadata = extractPostMetadataFromDocument(doc, filename);
+      if (!metadata) {
         return null;
       }
-    }))).filter(Boolean);
-
-    posts.sort((a, b) => {
-      const timeA = a.isoDate ? new Date(a.isoDate).getTime() : 0;
-      const timeB = b.isoDate ? new Date(b.isoDate).getTime() : 0;
-      if (timeA !== timeB) {
-        return timeB - timeA;
-      }
-      if (a.order !== undefined && b.order !== undefined) {
-        return a.order - b.order;
-      }
-      return (b.title || '').localeCompare(a.title || '');
-    });
-
-    posts.forEach((post) => {
-      if (Object.prototype.hasOwnProperty.call(post, 'order')) {
-        delete post.order;
-      }
-    });
-
-    const ttlValue = Number(config.postsCacheTtlMinutes);
-    const ttl = Number.isFinite(ttlValue) ? ttlValue : 30;
-    if (posts.length) {
-      writePostCache(posts, ttl);
+      return {
+        ...metadata,
+        order: index,
+      };
+    } catch (error) {
+      console.error('Impossibile estrarre i dati da', filename, error);
+      return null;
     }
+  }))).filter(Boolean);
 
-    return posts;
-  } catch (error) {
-    console.error('Errore durante il caricamento del manifesto dei post', error);
-    if (cached && cached.length) {
-      return cached;
+  posts.sort((a, b) => {
+    const timeA = a.isoDate ? new Date(a.isoDate).getTime() : 0;
+    const timeB = b.isoDate ? new Date(b.isoDate).getTime() : 0;
+    if (timeA !== timeB) {
+      return timeB - timeA;
     }
-    throw error;
+    if (a.order !== undefined && b.order !== undefined) {
+      return a.order - b.order;
+    }
+    return (b.title || '').localeCompare(a.title || '');
+  });
+
+  posts.forEach((post) => {
+    if (Object.prototype.hasOwnProperty.call(post, 'order')) {
+      delete post.order;
+    }
+  });
+
+  return posts;
+}
+
+async function fetchPostManifest() {
+  const cached = readPostCache();
+  if (cached && cached.length) {
+    return cached;
   }
+
+  const config = await loadSiteConfig();
+  const ttlValue = config ? Number(config.postsCacheTtlMinutes) : NaN;
+  const ttl = Number.isFinite(ttlValue) ? ttlValue : 30;
+
+  try {
+    const sitemapPosts = await fetchPostsFromSitemap();
+    if (sitemapPosts && sitemapPosts.length) {
+      writePostCache(sitemapPosts, ttl);
+      return sitemapPosts;
+    }
+  } catch (error) {
+    console.error('Impossibile utilizzare la sitemap per il manifesto', error);
+  }
+
+  if (config) {
+    try {
+      const githubPosts = await fetchPostsFromGitHub(config);
+      if (githubPosts && githubPosts.length) {
+        writePostCache(githubPosts, ttl);
+        return githubPosts;
+      }
+    } catch (error) {
+      console.error('Errore durante il caricamento del manifesto dei post', error);
+    }
+  }
+
+  if (cached && cached.length) {
+    return cached;
+  }
+
+  throw new Error('Impossibile recuperare le Macchine del Giorno automaticamente.');
 }
 
 function clearPostPlaceholders(container) {
