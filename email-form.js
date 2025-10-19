@@ -1901,33 +1901,7 @@ function enforceLayoutFallbacks() {
 }
 
 function initialisePostListings() {
-  const archiveTarget = document.querySelector('[data-archive-gallery]');
-  const homeTarget = document.querySelector('[data-home-macchina]');
-  if (!archiveTarget && !homeTarget) {
-    return;
-  }
-
-  fetchPostManifest()
-    .then((posts) => {
-      const list = Array.isArray(posts) ? posts : [];
-      const state = list.length ? 'ready' : 'empty';
-      if (archiveTarget) {
-        renderArchiveGallery(list, { state });
-      }
-      if (homeTarget) {
-        renderHomeSampler(list, { state });
-      }
-    })
-    .catch((error) => {
-      console.error('Impossibile inizializzare le liste delle macchine', error);
-      const message = (error && error.message) ? error.message : 'Servizio temporaneamente non disponibile.';
-      if (archiveTarget) {
-        renderArchiveGallery([], { state: 'error', message });
-      }
-      if (homeTarget) {
-        renderHomeSampler([], { state: 'error', message });
-      }
-    });
+    // Le liste vengono ora gestite manualmente nei file HTML.
 }
 
 function initialiseDetailGallery() {
