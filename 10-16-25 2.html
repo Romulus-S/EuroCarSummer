@@ -43,5 +43,276 @@
 
         <p><a href="index.html">Torna alla home</a></p>
     </main>
+    <footer>
+        © Euro Car Summer — Passione italiana per le auto d'epoca.
+    </footer>
+    <script>
+    // Gallery helper
+    (function () {
+        var FULLSCREEN_EVENTS = ['fullscreenchange', 'webkitfullscreenchange'];
+        function initGallery(root, images, options) {
+            if (!root || !images || images.length === 0) {
+                return;
+            }
+            var config = Object.assign({
+                showThumbnails: false,
+                showCounter: false,
+                enableKeyboard: false,
+                loop: true,
+                allowFullscreen: false
+            }, options || {});
+            root.classList.add('image-gallery');
+            if (config.variant) {
+                root.classList.add(config.variant);
+            }
+            root.dataset.galleryInitialised = 'true';
+            root.innerHTML = '';
+
+            var stage = document.createElement('div');
+            stage.className = 'gallery-stage';
+
+            var slides = images.map(function (image, index) {
+                var figure = document.createElement('figure');
+                figure.className = 'gallery-slide';
+                if (index === 0) {
+                    figure.classList.add('is-active');
+                }
+                if (image.hasAttribute('width')) {
+                    image.removeAttribute('width');
+                }
+                if (image.hasAttribute('height')) {
+                    image.removeAttribute('height');
+                }
+                if (!image.hasAttribute('loading')) {
+                    image.loading = 'lazy';
+                }
+                image.decoding = 'async';
+                figure.appendChild(image);
+                stage.appendChild(figure);
+                return figure;
+            });
+
+            var prevButton = document.createElement('button');
+            prevButton.type = 'button';
+            prevButton.className = 'gallery-control gallery-control--prev';
+            prevButton.setAttribute('aria-label', 'Immagine precedente');
+            prevButton.innerHTML = '&#10094;';
+
+            var nextButton = document.createElement('button');
+            nextButton.type = 'button';
+            nextButton.className = 'gallery-control gallery-control--next';
+            nextButton.setAttribute('aria-label', 'Immagine successiva');
+            nextButton.innerHTML = '&#10095;';
+
+            root.appendChild(prevButton);
+            root.appendChild(stage);
+            root.appendChild(nextButton);
+
+            var metaBar = document.createElement('div');
+            metaBar.className = 'gallery-meta';
+            root.appendChild(metaBar);
+
+            var counter = null;
+            if (config.showCounter) {
+                counter = document.createElement('p');
+                counter.className = 'gallery-counter';
+                counter.textContent = '1 / ' + slides.length;
+                metaBar.appendChild(counter);
+            }
+
+            var fullscreenButton = null;
+            var canFullscreen = config.allowFullscreen && slides.length > 0 && (root.requestFullscreen || root.webkitRequestFullscreen);
+            if (canFullscreen) {
+                fullscreenButton = document.createElement('button');
+                fullscreenButton.type = 'button';
+                fullscreenButton.className = 'gallery-fullscreen';
+                fullscreenButton.textContent = 'Schermo intero';
+                metaBar.appendChild(fullscreenButton);
+            }
+
+            if (!metaBar.hasChildNodes()) {
+                root.removeChild(metaBar);
+                metaBar = null;
+            }
+
+            var thumbnailBar = null;
+            var thumbnailButtons = [];
+            if (config.showThumbnails && slides.length > 1) {
+                thumbnailBar = document.createElement('div');
+                thumbnailBar.className = 'gallery-thumbnails';
+                slides.forEach(function (slide, index) {
+                    var button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'gallery-thumb';
+                    button.setAttribute('aria-label', 'Mostra immagine ' + (index + 1));
+                    var originalImage = slide.querySelector('img');
+                    if (originalImage) {
+                        var thumb = originalImage.cloneNode(true);
+                        thumb.removeAttribute('width');
+                        thumb.removeAttribute('height');
+                        thumb.loading = 'lazy';
+                        button.appendChild(thumb);
+                    }
+                    if (index === 0) {
+                        button.classList.add('is-active');
+                    }
+                    button.addEventListener('click', function () {
+                        showSlide(index);
+                    });
+                    thumbnailButtons.push(button);
+                    thumbnailBar.appendChild(button);
+                });
+                root.appendChild(thumbnailBar);
+            }
+
+            var currentIndex = 0;
+
+            function updateCounter(index) {
+                if (counter) {
+                    counter.textContent = (index + 1) + ' / ' + slides.length;
+                }
+            }
+
+            function updateThumbnails(index) {
+                thumbnailButtons.forEach(function (button, buttonIndex) {
+                    if (buttonIndex === index) {
+                        button.classList.add('is-active');
+                    } else {
+                        button.classList.remove('is-active');
+                    }
+                });
+            }
+
+            function showSlide(targetIndex) {
+                var index = targetIndex;
+                if (index < 0) {
+                    index = config.loop ? slides.length - 1 : 0;
+                } else if (index >= slides.length) {
+                    index = config.loop ? 0 : slides.length - 1;
+                }
+                if (index === currentIndex) {
+                    return;
+                }
+                slides[currentIndex].classList.remove('is-active');
+                slides[index].classList.add('is-active');
+                currentIndex = index;
+                updateCounter(currentIndex);
+                updateThumbnails(currentIndex);
+            }
+
+            prevButton.addEventListener('click', function () {
+                showSlide(currentIndex - 1);
+            });
+
+            nextButton.addEventListener('click', function () {
+                showSlide(currentIndex + 1);
+            });
+
+            if (config.enableKeyboard) {
+                root.setAttribute('tabindex', '0');
+                root.addEventListener('keydown', function (event) {
+                    if (event.key === 'ArrowLeft') {
+                        event.preventDefault();
+                        showSlide(currentIndex - 1);
+                    } else if (event.key === 'ArrowRight') {
+                        event.preventDefault();
+                        showSlide(currentIndex + 1);
+                    }
+                });
+            }
+
+            function isFullscreenActive() {
+                return document.fullscreenElement === root || document.webkitFullscreenElement === root;
+            }
+
+            function syncFullscreenState() {
+                if (!fullscreenButton) {
+                    return;
+                }
+                if (isFullscreenActive()) {
+                    fullscreenButton.textContent = 'Chiudi schermo intero';
+                    fullscreenButton.setAttribute('aria-pressed', 'true');
+                } else {
+                    fullscreenButton.textContent = 'Schermo intero';
+                    fullscreenButton.setAttribute('aria-pressed', 'false');
+                }
+            }
+
+            if (fullscreenButton) {
+                fullscreenButton.addEventListener('click', function () {
+                    if (isFullscreenActive()) {
+                        try {
+                            if (document.exitFullscreen) {
+                                document.exitFullscreen();
+                            } else if (document.webkitExitFullscreen) {
+                                document.webkitExitFullscreen();
+                            }
+                        } catch (error) {}
+                    } else {
+                        try {
+                            if (root.requestFullscreen) {
+                                root.requestFullscreen();
+                            } else if (root.webkitRequestFullscreen) {
+                                root.webkitRequestFullscreen();
+                            }
+                        } catch (error) {}
+                    }
+                });
+
+                FULLSCREEN_EVENTS.forEach(function (eventName) {
+                    document.addEventListener(eventName, syncFullscreenState);
+                });
+
+                syncFullscreenState();
+            }
+
+            updateCounter(currentIndex);
+        }
+
+        function enhanceCardGalleries() {
+            document.querySelectorAll('.card-gallery').forEach(function (container) {
+                if (container.dataset.galleryInitialised === 'true') {
+                    return;
+                }
+                var images = Array.from(container.querySelectorAll('img'));
+                if (images.length <= 1) {
+                    container.classList.add('card-gallery--single');
+                    return;
+                }
+                var wrapper = document.createElement('div');
+                wrapper.className = 'image-gallery image-gallery--card';
+                container.replaceWith(wrapper);
+                initGallery(wrapper, images, {
+                    showCounter: true
+                });
+            });
+        }
+
+        function enhancePostGallery() {
+            var detail = document.querySelector('.post-detail');
+            if (!detail) {
+                return;
+            }
+            var images = Array.from(detail.querySelectorAll('img'));
+            if (images.length <= 1) {
+                return;
+            }
+            var wrapper = document.createElement('div');
+            wrapper.className = 'image-gallery image-gallery--post';
+            detail.insertBefore(wrapper, images[0]);
+            initGallery(wrapper, images, {
+                showCounter: true,
+                showThumbnails: true,
+                enableKeyboard: true,
+                allowFullscreen: true
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            enhanceCardGalleries();
+            enhancePostGallery();
+        });
+    })();
+    </script>
 </body>
 </html>
