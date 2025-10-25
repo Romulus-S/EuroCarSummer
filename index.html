@@ -5,149 +5,57 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Euro Car Summer</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="email-form.js" defer></script>
-    <style>
-        main {
-            max-width: 960px;
-            margin: 0 auto 3rem;
-            padding: 0 1.5rem;
-        }
-
-        .hero {
-            text-align: center;
-        }
-
-        .hero img {
-            max-width: 300px;
-            width: 100%;
-        }
-
-        .hero p {
-            margin: 1rem auto 2rem;
-            max-width: 42rem;
-        }
-
-        .preview-stack {
-            display: flex;
-            flex-direction: column;
-            gap: 2.5rem;
-            margin-top: 2.5rem;
-        }
-
-        .preview-block {
-            background: rgba(244, 246, 248, 0.85);
-            border-radius: 18px;
-            padding: 2rem;
-            text-align: left;
-            box-shadow: 0 24px 40px -30px rgba(11, 31, 51, 0.5);
-        }
-
-        .preview-header {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .preview-header h2 {
-            margin: 0;
-            font-size: 1.75rem;
-            color: var(--brand-navy);
-        }
-
-        .preview-header p {
-            margin: 0;
-            color: rgba(17, 24, 39, 0.78);
-        }
-
-        .preview-link {
-            align-self: flex-start;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.35rem;
-            font-weight: bold;
-            color: var(--brand-navy);
-            text-decoration: none;
-        }
-
-        .preview-block .post-gallery {
-            margin-top: 1rem;
-        }
-
-        .preview-block .post-title {
-            color: var(--brand-navy);
-        }
-
-        .preview-block .post-date {
-            font-weight: 500;
-        }
-
-        @media (max-width: 600px) {
-            .preview-block {
-                padding: 1.75rem 1.5rem;
-            }
-        }
-    </style>
 </head>
 <body>
+    <header class="site-header">
+        <div class="header-inner">
+            <a class="site-title" href="index.html">Euro Car Summer</a>
+            <nav class="site-nav">
+                <a href="index.html">Home</a>
+                <a href="macchina-del-giorno.html">Macchina del Giorno</a>
+            </nav>
+        </div>
+    </header>
     <main>
-        <section class="hero">
-            <img src="images/textlogo.png" alt="Euro Car Summer">
-            <p>Channel the Mediterranean this summer by bringing a Euro car home. On this website, you'll find the coolest rides available for sale today in Italy.</p>
-            <div class="preview-stack">
-                <section class="preview-block">
-                    <div class="preview-header">
-                        <h2>Annunci Esclusivi</h2>
-                        <p>Una selezione curata dei migliori affari estivi: sportive rare, icone da spiaggia e instant classic pronti a partire.</p>
-                        <a class="preview-link" href="annunci-esclusivi.html">Esplora gli annunci →</a>
-                    </div>
-                    <ul class="post-gallery">
-                        <li class="post-card">
-                            <a href="annunci-esclusivi.html#merak">
-                                <h3 class="post-title">Maserati Merak 2000 GT</h3>
-                                <div class="post-thumbnail">
-                                    <img src="images/9:17 1.jpeg" alt="1978 Maserati Merak 2000 GT">
-                                </div>
-                                <p class="post-date">Annuncio esclusivo • settembre 2025</p>
-                            </a>
-                        </li>
-                        <li class="post-card">
-                            <a href="annunci-esclusivi.html#lotus">
-                                <h3 class="post-title">Lotus Europa S1</h3>
-                                <div class="post-thumbnail">
-                                    <img src="images/9:21 1.jpeg" alt="1967 Lotus Europa">
-                                </div>
-                                <p class="post-date">Scopri la selezione completa →</p>
-                            </a>
-                        </li>
-                        <li class="post-card">
-                            <a href="annunci-esclusivi.html#mehari">
-                                <h3 class="post-title">Citroën Méhari Barn Find</h3>
-                                <div class="post-thumbnail">
-                                    <img src="images/9:18 1.jpeg" alt="Citroën Méhari Barn Find">
-                                </div>
-                                <p class="post-date">Un assaggio degli annunci premium</p>
-                            </a>
-                        </li>
-                    </ul>
-                </section>
-                <section class="preview-block">
-                    <div class="preview-header">
-                        <h2>Macchina Del Giorno</h2>
-                        <p>Ogni mattina mettiamo sotto i riflettori un annuncio speciale, completo della sua prima immagine e della data.</p>
-                        <a class="preview-link" href="macchina-del-giorno.html">Sfoglia tutte le macchine →</a>
-                    </div>
-                    <ul class="post-gallery" data-home-macchina>
-                        <li class="post-card is-status" data-placeholder>
-                            <p class="post-date">Le ultime Macchine del Giorno appariranno qui a breve…</p>
-                        </li>
-                    </ul>
-                    <noscript>
-                        <p class="post-date">Attiva JavaScript per vedere automaticamente le ultime tre Macchine del Giorno.</p>
-                    </noscript>
-                </section>
-            </div>
-        </section>
+        <div class="container">
+            <section class="hero">
+                <h1>Macchine per sognare tutta l'estate</h1>
+                <p>Euro Car Summer è la tua raccolta personale di annunci d'epoca e youngtimer scoperti in Italia. Sfoglia le nostre "Macchine del Giorno" per trovare ispirazione per il tuo prossimo progetto da appassionato.</p>
+            </section>
+
+            <section>
+                <div class="section-heading">
+                    <h2>Ultime Macchine del Giorno</h2>
+                    <a href="macchina-del-giorno.html">Guarda tutto l'archivio</a>
+                </div>
+                <ul class="post-gallery">
+<li class="post-card">
+    <a href="10-16-25.html">
+        <img src="images/8:30 1.jpeg" alt="1995 Alfa Romeo GTV 2.0 Twin Spark">
+        <h3 class="post-title">1995 Alfa Romeo GTV 2.0 Twin Spark</h3>
+        <p class="post-date">October 16, 2025</p>
+    </a>
+</li>
+<li class="post-card">
+    <a href="9-23-25.html">
+        <img src="images/9:23 1.jpeg" alt="1970 Fiat 124 Sport Coupe">
+        <h3 class="post-title">1970 Fiat 124 Sport Coupe</h3>
+        <p class="post-date">September 23, 2025</p>
+    </a>
+</li>
+<li class="post-card">
+    <a href="9-22-25.html">
+        <img src="images/9:21 1.jpeg" alt="1969 Fiat 500L">
+        <h3 class="post-title">1969 Fiat 500L</h3>
+        <p class="post-date">September 22, 2025</p>
+    </a>
+</li>
+                </ul>
+            </section>
+        </div>
     </main>
+    <footer>
+        © Euro Car Summer — Passione italiana per le auto d'epoca.
+    </footer>
 </body>
 </html>
