@@ -185,7 +185,7 @@ main {
   color: var(--accent);
 }
 
-footer {
+.site-footer {
   margin-top: 3rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--border);
@@ -203,4 +203,10 @@ footer {
   .site-nav {
     flex-wrap: wrap;
   }
+}
+
+.site-footer .footer-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
 }
