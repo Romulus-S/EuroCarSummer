@@ -6,6 +6,7 @@
       <nav class="site-nav" aria-label="Navigazione principale">
         <a href="index.html">Home</a>
         <a href="for-americans.html">For Americans</a>
+        <a href="sold.html">Sold</a>
       </nav>
     </div>
   `;
