@@ -210,3 +210,252 @@ main {
   margin: 0 auto;
   padding: 0 1.5rem;
 }
+
+
+.sold-page {
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+}
+
+.sold-hero {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.sold-hero p {
+  color: var(--muted);
+}
+
+.sold-car {
+  display: grid;
+  gap: 1.75rem;
+  align-items: start;
+}
+
+@media (min-width: 880px) {
+  .sold-car {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: 2.5rem;
+  }
+}
+
+.sold-car__media {
+  position: relative;
+}
+
+.sold-car__content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sold-car__content ul {
+  padding-left: 1.2rem;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.sold-gallery {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0f1e33;
+  color: #ffffff;
+}
+
+.sold-gallery__frame {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: #000;
+}
+
+.sold-gallery img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.35s ease;
+  opacity: 0;
+}
+
+.sold-gallery img.is-active {
+  opacity: 1;
+}
+
+.sold-gallery__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(15, 30, 51, 0.7);
+  color: #ffffff;
+  border: none;
+  border-radius: 50%;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  font-size: 1.75rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.sold-gallery__nav:hover,
+.sold-gallery__nav:focus {
+  background: rgba(233, 110, 47, 0.9);
+  outline: none;
+}
+
+.sold-gallery__nav--prev {
+  left: 1rem;
+}
+
+.sold-gallery__nav--next {
+  right: 1rem;
+}
+
+.sold-gallery__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem 1rem;
+  font-weight: 600;
+}
+
+.sold-gallery__fullscreen {
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: transparent;
+  color: inherit;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.sold-gallery__fullscreen:hover,
+.sold-gallery__fullscreen:focus {
+  background: #ffffff;
+  color: #0f1e33;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgba(10, 18, 32, 0.92);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 999;
+}
+
+.lightbox.is-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.lightbox__content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  max-width: min(1100px, 100%);
+  width: 100%;
+  color: #ffffff;
+}
+
+.lightbox__figure {
+  margin: 0;
+  flex: 1;
+  text-align: center;
+}
+
+.lightbox__image {
+  width: 100%;
+  max-height: min(80vh, 700px);
+  object-fit: contain;
+  border-radius: 12px;
+}
+
+.lightbox__caption {
+  margin-top: 0.75rem;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.lightbox__counter {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.lightbox__nav {
+  background: rgba(19, 39, 67, 0.85);
+  border: none;
+  color: #ffffff;
+  font-size: 2.5rem;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.lightbox__nav:hover,
+.lightbox__nav:focus {
+  background: rgba(233, 110, 47, 0.9);
+  outline: none;
+}
+
+.lightbox__close {
+  position: absolute;
+  top: -2.5rem;
+  right: 0;
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-size: 2rem;
+  cursor: pointer;
+}
+
+.lightbox__backdrop {
+  position: absolute;
+  inset: 0;
+}
+
+body.lightbox-open {
+  overflow: hidden;
+}
+
+@media (max-width: 720px) {
+  .sold-gallery__nav {
+    width: 36px;
+    height: 36px;
+    font-size: 1.5rem;
+  }
+
+  .sold-gallery__controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .lightbox__content {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .lightbox__nav {
+    position: static;
+    order: 3;
+  }
+}
