@@ -22,15 +22,28 @@
 
   function normalisePath(href) {
     if (!href) return '';
-    const url = new URL(href, window.location.origin);
-    let pathname = url.pathname || '';
-    if (pathname === '/' || pathname === '') {
-      return 'index.html';
+    const hasOrigin = window.location.origin && window.location.origin !== 'null';
+    const base = hasOrigin
+      ? window.location.origin
+      : window.location.href.replace(/[^/]*$/, '');
+    try {
+      const url = new URL(href, base);
+      let pathname = url.pathname || '';
+      if (pathname === '/' || pathname === '') {
+        return 'index.html';
+      }
+      pathname = pathname.replace(/^\//, '');
+      if (!hasOrigin) {
+        const parts = pathname.split('/').filter(Boolean);
+        pathname = parts.length ? parts[parts.length - 1] : pathname;
+      }
+      return pathname;
+    } catch (error) {
+      if (href === '/' || href === '') {
+        return 'index.html';
+      }
+      return href.replace(/^[./]+/, '');
     }
-    if (pathname.startsWith('/')) {
-      pathname = pathname.slice(1);
-    }
-    return pathname;
   }
 
   function setActiveLink(nav) {
