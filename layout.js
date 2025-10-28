@@ -18,6 +18,8 @@
     </div>
   `;
 
+  const lightbox = createLightbox();
+
   function normalisePath(href) {
     if (!href) return '';
     const url = new URL(href, window.location.origin);
@@ -70,13 +72,181 @@
     footer.innerHTML = footerMarkup;
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      ensureHeader();
-      ensureFooter();
-    });
-  } else {
+ function initialiseSite() {
     ensureHeader();
     ensureFooter();
+
+   initGalleries();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initialiseSite);
+  } else {
+    initialiseSite();
+  }
+
+  function initGalleries() {
+    const galleries = document.querySelectorAll('[data-gallery]');
+    galleries.forEach((gallery) => {
+      if (gallery.__galleryInitialised) return;
+      gallery.__galleryInitialised = true;
+      setupGallery(gallery);
+    });
+  }
+
+  function setupGallery(gallery) {
+    const images = Array.from(gallery.querySelectorAll('img'));
+    const counter = gallery.querySelector('[data-counter]');
+    const nextButton = gallery.querySelector('[data-next]');
+    const prevButton = gallery.querySelector('[data-prev]');
+    const fullscreenButton = gallery.querySelector('[data-fullscreen]');
+
+    if (!images.length) return;
+
+    const state = {
+      images,
+      index: 0,
+      goTo(nextIndex) {
+        const total = images.length;
+        state.index = (nextIndex + total) % total;
+        images.forEach((img, idx) => {
+          const isActive = idx === state.index;
+          img.classList.toggle('is-active', isActive);
+          if (isActive) {
+            img.removeAttribute('hidden');
+            img.setAttribute('aria-hidden', 'false');
+          } else {
+            img.setAttribute('hidden', 'hidden');
+            img.setAttribute('aria-hidden', 'true');
+          }
+        });
+        if (counter) {
+          counter.textContent = `${state.index + 1} / ${total}`;
+        }
+        if (lightbox.isOpen(state)) {
+          lightbox.update(state);
+        }
+      },
+      next() {
+        state.goTo(state.index + 1);
+      },
+      prev() {
+        state.goTo(state.index - 1);
+      }
+    };
+
+    if (nextButton) {
+      nextButton.addEventListener('click', () => state.next());
+    }
+    if (prevButton) {
+      prevButton.addEventListener('click', () => state.prev());
+    }
+    images.forEach((img) => {
+      img.addEventListener('click', () => lightbox.open(state));
+    });
+    if (fullscreenButton) {
+      fullscreenButton.addEventListener('click', () => lightbox.open(state));
+    }
+
+    state.goTo(0);
+  }
+
+  function createLightbox() {
+    const overlay = document.createElement('div');
+    overlay.className = 'lightbox';
+    overlay.setAttribute('aria-hidden', 'true');
+    overlay.innerHTML = `
+      <div class="lightbox__backdrop" data-close></div>
+      <div class="lightbox__content" role="dialog" aria-modal="true" aria-label="Full screen image viewer">
+        <button class="lightbox__close" type="button" data-close aria-label="Close full screen">×</button>
+        <button class="lightbox__nav lightbox__nav--prev" type="button" data-prev aria-label="Previous image">‹</button>
+        <figure class="lightbox__figure">
+          <img class="lightbox__image" src="" alt="" />
+          <figcaption class="lightbox__caption"></figcaption>
+          <span class="lightbox__counter" data-counter>0 / 0</span>
+        </figure>
+        <button class="lightbox__nav lightbox__nav--next" type="button" data-next aria-label="Next image">›</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const closeButton = overlay.querySelector('.lightbox__close');
+    const nextButton = overlay.querySelector('[data-next]');
+    const prevButton = overlay.querySelector('[data-prev]');
+    const imageEl = overlay.querySelector('.lightbox__image');
+    const captionEl = overlay.querySelector('.lightbox__caption');
+    const counterEl = overlay.querySelector('.lightbox__counter');
+
+    let activeState = null;
+
+    function open(state) {
+      if (!state || !state.images.length) return;
+      activeState = state;
+      overlay.classList.add('is-active');
+      overlay.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('lightbox-open');
+      update(state);
+    }
+
+    function close() {
+      overlay.classList.remove('is-active');
+      overlay.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('lightbox-open');
+      activeState = null;
+    }
+
+    function update(state = activeState) {
+      if (!state) return;
+      const currentImage = state.images[state.index];
+      if (!currentImage) return;
+      imageEl.src = currentImage.src;
+      imageEl.alt = currentImage.alt || '';
+      captionEl.textContent = currentImage.dataset.caption || currentImage.alt || '';
+      counterEl.textContent = `${state.index + 1} / ${state.images.length}`;
+    }
+
+    function handleKeydown(event) {
+      if (!activeState) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        close();
+        return;
+      }
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        activeState.prev();
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        activeState.next();
+      }
+    }
+
+    overlay.addEventListener('click', (event) => {
+      if (event.target && 'close' in event.target.dataset) {
+        close();
+      }
+    });
+
+    nextButton.addEventListener('click', () => {
+      if (activeState) {
+        activeState.next();
+      }
+    });
+    prevButton.addEventListener('click', () => {
+      if (activeState) {
+        activeState.prev();
+      }
+    });
+    closeButton.addEventListener('click', () => close());
+    document.addEventListener('keydown', handleKeydown);
+
+    return {
+      open,
+      close,
+      update,
+      isOpen(state) {
+        return activeState === state;
+      }
+    };
   }
 })();
