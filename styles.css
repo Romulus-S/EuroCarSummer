@@ -185,6 +185,13 @@ main {
   color: var(--accent);
 }
 
+.post-detail ul {
+  padding-left: 1.2rem;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
 .site-footer {
   margin-top: 3rem;
   padding-top: 1.5rem;
@@ -258,7 +265,7 @@ main {
   gap: 0.5rem;
 }
 
-.sold-gallery {
+.media-gallery {
   position: relative;
   border-radius: 16px;
   overflow: hidden;
@@ -266,13 +273,13 @@ main {
   color: #ffffff;
 }
 
-.sold-gallery__frame {
+.media-gallery__frame {
   position: relative;
   aspect-ratio: 4 / 3;
   background: #000;
 }
 
-.sold-gallery img {
+.media-gallery img {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -282,11 +289,11 @@ main {
   opacity: 0;
 }
 
-.sold-gallery img.is-active {
+.media-gallery img.is-active {
   opacity: 1;
 }
 
-.sold-gallery__nav {
+.media-gallery__nav {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
@@ -303,21 +310,21 @@ main {
   transition: background 0.2s ease;
 }
 
-.sold-gallery__nav:hover,
-.sold-gallery__nav:focus {
+.media-gallery__nav:hover,
+.media-gallery__nav:focus {
   background: rgba(233, 110, 47, 0.9);
   outline: none;
 }
 
-.sold-gallery__nav--prev {
+.media-gallery__nav--prev {
   left: 1rem;
 }
 
-.sold-gallery__nav--next {
+.media-gallery__nav--next {
   right: 1rem;
 }
 
-.sold-gallery__controls {
+.media-gallery__controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -326,7 +333,7 @@ main {
   font-weight: 600;
 }
 
-.sold-gallery__fullscreen {
+.media-gallery__fullscreen {
   border: 1px solid rgba(255, 255, 255, 0.6);
   background: transparent;
   color: inherit;
@@ -336,8 +343,8 @@ main {
   transition: background 0.2s ease, color 0.2s ease;
 }
 
-.sold-gallery__fullscreen:hover,
-.sold-gallery__fullscreen:focus {
+.media-gallery__fullscreen:hover,
+.media-gallery__fullscreen:focus {
   background: #ffffff;
   color: #0f1e33;
 }
@@ -438,13 +445,13 @@ body.lightbox-open {
 }
 
 @media (max-width: 720px) {
-  .sold-gallery__nav {
+  .media-gallery__nav {
     width: 36px;
     height: 36px;
     font-size: 1.5rem;
   }
 
-  .sold-gallery__controls {
+  .media-gallery__controls {
     flex-direction: column;
     align-items: flex-start;
   }
